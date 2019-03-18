@@ -1,0 +1,26 @@
+<!-- phpunit.xml.dist -->
+<phpunit
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://schema.phpunit.de/4.6/phpunit.xsd"
+        colors="true"
+        verbose="true">
+    <testsuites>
+        <testsuite name="Composerize Drupal Test Suite">
+            <directory>tests/phpunit</directory>
+        </testsuite>
+    </testsuites>
+    <logging>
+        <log type="coverage-clover" target="build/logs/clover.xml"/>
+    </logging>
+    <filter>
+        <whitelist processUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">src</directory>
+            <exclude>
+              <!-- These files are tested, but using shell_exec(), which
+                   prevents code coverage tracking. -->
+              <file>src/Composer/CommandProvider.php</file>
+              <file>src/Composer/Plugin.php</file>
+            </exclude>
+        </whitelist>
+    </filter>
+</phpunit>
