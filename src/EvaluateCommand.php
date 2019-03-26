@@ -395,7 +395,7 @@ class EvaluateCommand extends Command
             ['field_issue_version' => $version]);
         // @todo handle 0 issues edge case.
         $output->writeln("<info>Issue statistics</info> for <comment>$version</comment>");
-        $output->writeln("  <info>total issues</info>:  " . $num_issues);
+        $output->writeln("  <info>Total issues</info>:  " . $num_issues);
         $output->writeln('  <info>By priority</info>:');
 
         $num_crit_issues = $this->countProjectIssues($project, [
@@ -472,7 +472,7 @@ class EvaluateCommand extends Command
             $query = [
                 'field_project' => $project->nid,
                 'type' => 'project_issue',
-                'field_issue_status' => Statuses::FIXED,
+                'field_issue_status' => Statuses::CLOSED_FIXED,
                 'sort' => 'changed',
                 'direction' => 'DESC',
             ];
@@ -485,7 +485,7 @@ class EvaluateCommand extends Command
                 $latest_issue_date = 'never';
             }
 
-            $output->writeln("  <info>last fixed</info>:  $latest_issue_date");
+            $output->writeln("  <info>Last \"Closed (fixed)\"</info>:  $latest_issue_date");
         }
     }
 

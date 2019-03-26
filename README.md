@@ -7,32 +7,34 @@
 Example usage:
 
 ```
-$ ./bin/evaluate ctools
+$ ./bin/evaluate acquia_connector --dev-version=8.x-1.x-dev
 
-Chaos Tool Suite (ctools) (ctools)
-Downloads:  11235782
+Acquia Connector (acquia_connector)
+Downloads:  991665
 SA Coverage:  covered
-Starred:  130
-Usage:  141162
-# issues for 8.x-3.x-dev:  200
+Starred:  10
+Usage:  9337
+Issue statistics for 8.x-1.x-dev
+  total issues:  68
   By priority:
-    # critical:  3 (1.50%)
-    # major:     20 (10.00%)
-    # normal:    100 (50.00%)
-    # minor:     7 (3.50%)
+    # critical:  5 (7.35%)
+    # major:     13 (19.12%)
+    # normal:    48 (70.59%)
+    # minor:     2 (2.94%)
   By category:
-    # bug:       99 (49.50%)
-    # feature:   39 (19.50%)
-    # support:   3 (1.50%)
-    # task:      83 (41.50%)
-    # plan:      4 (2.00%)
-  last fixed:  Mon, 25 Mar 2019 21:18:38 +0000
-# releases:      17
-last release:    Thu, 21 Feb 2019 05:49:00 +0000
-Deprecation errors: 0
-Deprecation file errors: 91
-Coding standards errors: 802
-Coding standards warnings: 86
+    # bug:       45 (66.18%)
+    # feature:   6 (8.82%)
+    # support:   4 (5.88%)
+    # task:      13 (19.12%)
+    # plan:      0 (0.00%)
+  Last "Closed (fixed)":  Thu, 28 Feb 2019 15:28:27 +0000
+# releases:      19
+last release:    Wed, 06 Feb 2019 18:09:19 +0000
+Code Analysis for 8.x-1.16:
+  Deprecation errors: 0
+  Deprecation file errors: 36
+  Coding standards errors: 640
+  Coding standards warnings: 81
 ```
 
 ## Scoring
