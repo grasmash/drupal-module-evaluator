@@ -115,7 +115,7 @@ class EvaluateCommand extends Command
         // @todo Throw exception if no release is found!
 
         // Download module.
-        // @todo define version dynamically.
+        // @todo Find latest stable version!
         $project_string = $project_name . "-" . $major_version . '-' . '3.0';
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
@@ -303,7 +303,7 @@ class EvaluateCommand extends Command
         $command
     ): \Symfony\Component\Process\Process {
         $root_dir = dirname(__DIR__);
-        $process = new Process($command, $root_dir);
+        $process = new Process($command, $root_dir, null, null, 300);
         $process->start();
         if ($this->output->isVerbose()) {
             foreach ($process as $type => $data) {
