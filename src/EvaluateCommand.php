@@ -76,8 +76,8 @@ class EvaluateCommand extends Command
         $this->setDescription("Evaluate a contributed Drupal project.");
         $this->addArgument('project', InputArgument::REQUIRED, 'The machine name of the project to evaluate.');
         $this->addOption('dev-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for issue statistics.');
-        $this->addOption('stable-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for issue statistics.');
-        $this->addUsage('acquia_connector 8.x-1.x');
+        $this->addOption('stable-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for code analysis.');
+        $this->addUsage('acquia_connector --dev-version=8.x-1.x-dev');
         // @todo Assume major version, allow to be specified.
     }
 

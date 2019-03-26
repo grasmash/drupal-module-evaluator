@@ -8,6 +8,7 @@ Install:
 ```
 git clone git@github.com:grasmash/drupal-module-evaluator.git
 cd drupal-module-evaluator
+composer install
 ```
 
 Example usage:
