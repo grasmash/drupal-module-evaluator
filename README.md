@@ -4,8 +4,13 @@
 
 # Module Evaluator
 
-Example usage:
+Install:
+```
+git clone git@github.com:grasmash/drupal-module-evaluator.git
+cd drupal-module-evaluator
+```
 
+Example usage:
 ```
 $ ./bin/evaluate acquia_connector --dev-version=8.x-1.x-dev
 
