@@ -75,7 +75,9 @@ class EvaluateCommand extends Command
         $this->setName('evaluate');
         $this->setDescription("Evaluate a contributed Drupal project.");
         $this->addArgument('project', InputArgument::REQUIRED, 'The machine name of the project to evaluate.');
-        $this->addUsage('ctools');
+        $this->addOption('dev-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for issue statistics.');
+        $this->addOption('stable-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for issue statistics.');
+        $this->addUsage('acquia_connector 8.x-1.x');
         // @todo Assume major version, allow to be specified.
     }
 
@@ -95,6 +97,7 @@ class EvaluateCommand extends Command
         $this->input = $input;
         $this->output = $output;
         $project_name = $input->getArgument('project');
+        // @todo Change this to a dynamic value from argument.
         $major_version = '8.x';
         $core_compatibility = CoreCompatibilityTerms::DRUPAL_8X;
         $this->fs = new Filesystem();
@@ -105,25 +108,31 @@ class EvaluateCommand extends Command
             $major_version);
 
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
-        // We're only querying dev versions. E.g., 8.x-3-x-dev.
-        foreach ($project_releases as $project_release) {
-            if ($project_release->field_release_version_extra && substr($project_release->field_release_version, 0, 3) == $major_version) {
-                $version = $project_release->field_release_version;
-                break;
-            }
+
+        if ($input->hasArgument('dev-release')) {
+            $dev_version = $input->getArgument('dev-release');
         }
-        // @todo Throw exception if no release is found!
+        else {
+            $dev_version = $this->determineDevRelease($project_releases,
+                $major_version, $project_name);
+        }
+
+        if ($input->hasArgument('stable-release')) {
+            $recommended_version = $input->getArgument('stable-release');
+        }
+        else {
+            $recommended_version = $this->determineRecommendedRelease($project_releases, $major_version, $project_name);
+        }
 
         // Download module.
-        // @todo Find latest stable version!
-        $project_string = $project_name . "-" . $major_version . '-' . '3.0';
+        $project_string = $project_name . "-" . $recommended_version;
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
         // Code analysis.
         $phpstan_process = $this->startPhpStan($download_path);
         $phpcs_process = $this->startPhpCs($download_path);
 
-        $this->summarizeIssues($output, $project, $version);
+        $this->summarizeIssues($output, $project, $dev_version);
         $this->summarizeReleases($output, $project_releases);
 
         // Calculate a "maintenance health" score based on:
@@ -139,6 +148,7 @@ class EvaluateCommand extends Command
         // $project = new ContribProject($response_object);
         // https://www.drupal.org/api-d7/node.json?type=project_issue&field_project=3060&taxonomy_vocabulary_9=187541
 
+        $output->writeln("Code Analysis for <comment>$dev_version</comment>:");
         $this->endPhpStan($output, $phpstan_process, $project_name);
         $this->endPhpCs($output, $phpcs_process, $project_name);
 
@@ -326,11 +336,11 @@ class EvaluateCommand extends Command
         $phpstan_process->wait();
         if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
-            $output->writeln("Deprecation errors: {$phpstan_output->totals->errors}");
-            $output->writeln("Deprecation file errors: {$phpstan_output->totals->file_errors}");
+            $output->writeln("  <info>Deprecation errors</info>: {$phpstan_output->totals->errors}");
+            $output->writeln("  <info>Deprecation file errors</info>: {$phpstan_output->totals->file_errors}");
         }
         else {
-            $output->writeln("<error>Failed to execute PHPStan against $project_name</error>");
+            $output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
             $output->write($phpstan_process->getErrorOutput());
         }
     }
@@ -349,11 +359,11 @@ class EvaluateCommand extends Command
         $phpcs_process->wait();
         if ($phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
-            $output->writeln("Coding standards errors: {$phpcs_output->totals->errors}");
-            $output->writeln("Coding standards warnings: {$phpcs_output->totals->warnings}");
+            $output->writeln("  <info>Coding standards errors</info>: {$phpcs_output->totals->errors}");
+            $output->writeln("  <info>Coding standards warnings</info>: {$phpcs_output->totals->warnings}");
         }
         else {
-            $output->writeln("<error>Failed to execute PHPCS against $project_name</error>");
+            $output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
             $output->write($phpcs_process->getErrorOutput());
         }
     }
@@ -379,12 +389,13 @@ class EvaluateCommand extends Command
         $project,
         $version
     ): void {
-// Determine version to filter on.
+        // Determine version to filter on.
         // @todo Only count issues that are not closed!
         $num_issues = $this->countProjectIssues($project,
             ['field_issue_version' => $version]);
         // @todo handle 0 issues edge case.
-        $output->writeln("<info># issues</info> for <comment>$version</comment>:  " . $num_issues);
+        $output->writeln("<info>Issue statistics</info> for <comment>$version</comment>");
+        $output->writeln("  <info>total issues</info>:  " . $num_issues);
         $output->writeln('  <info>By priority</info>:');
 
         $num_crit_issues = $this->countProjectIssues($project, [
@@ -466,9 +477,14 @@ class EvaluateCommand extends Command
                 'direction' => 'DESC',
             ];
             $response_object = $this->requestNode($query);
-            $latest_issue = $response_object->list[0];
+            if (count($response_object->list)) {
+                $latest_issue = $response_object->list[0];
+                $latest_issue_date = date('r', $latest_issue->changed);
+            }
+            else {
+                $latest_issue_date = 'never';
+            }
 
-            $latest_issue_date = date('r', $latest_issue->changed);
             $output->writeln("  <info>last fixed</info>:  $latest_issue_date");
         }
     }
@@ -523,6 +539,63 @@ class EvaluateCommand extends Command
 
         $project = $response_object->list[0];
         return $project;
+    }
+
+    /**
+     * @param $project_releases
+     * @param $major_version
+     * @param $project_name
+     *
+     * @throws \Exception
+     * @return string
+     */
+    protected function determineRecommendedRelease(
+        $project_releases,
+        $major_version,
+        $project_name) {
+        // Stable releases are typically at the end of the array.
+        $releases = array_reverse($project_releases);
+        foreach ($releases as $project_release) {
+
+            // If field_release_version_extra is null, then it is not a dev
+            // alpha, beta, or rc release.
+            if (is_null($project_release->field_release_version_extra)
+                && substr($project_release->field_release_version,
+                    0, 3) == $major_version) {
+                $recommended_version = $project_release->field_release_version;
+                return $recommended_version;
+            }
+        }
+        if (!isset($recommended_version)) {
+            throw new \Exception("Unable to determine recommended release for $project_name for Drupal major version $major_version.");
+        }
+    }
+
+    /**
+     * @param $project_releases
+     * @param $major_version
+     * @param $project_name
+     *
+     * @return mixed
+     * @throws \Exception
+     */
+    protected function determineDevRelease(
+        $project_releases,
+        $major_version,
+        $project_name
+    ) {
+        // We're only querying dev versions. E.g., 8.x-3-x-dev.
+        foreach ($project_releases as $project_release) {
+            if ($project_release->field_release_version_extra
+                && substr($project_release->field_release_version,0, 3) == $major_version
+                && $project_release->field_release_version_extra == 'dev') {
+                $dev_version = $project_release->field_release_version;
+                return $dev_version;
+            }
+        }
+        if (!isset($dev_version)) {
+            throw new \Exception("Unable to find development release for $project_name for Drupal major version $major_version.");
+        }
     }
 
 }
