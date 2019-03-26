@@ -109,16 +109,16 @@ class EvaluateCommand extends Command
 
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
-        if ($input->hasArgument('dev-release')) {
-            $dev_version = $input->getArgument('dev-release');
+        if ($input->getOption('dev-version')) {
+            $dev_version = $input->getOption('dev-version');
         }
         else {
             $dev_version = $this->determineDevRelease($project_releases,
                 $major_version, $project_name);
         }
 
-        if ($input->hasArgument('stable-release')) {
-            $recommended_version = $input->getArgument('stable-release');
+        if ($input->getOption('stable-version')) {
+            $recommended_version = $input->getOption('stable-version');
         }
         else {
             $recommended_version = $this->determineRecommendedRelease($project_releases, $major_version, $project_name);
@@ -148,7 +148,7 @@ class EvaluateCommand extends Command
         // $project = new ContribProject($response_object);
         // https://www.drupal.org/api-d7/node.json?type=project_issue&field_project=3060&taxonomy_vocabulary_9=187541
 
-        $output->writeln("Code Analysis for <comment>$dev_version</comment>:");
+        $output->writeln("Code Analysis for <comment>$recommended_version</comment>:");
         $this->endPhpStan($output, $phpstan_process, $project_name);
         $this->endPhpCs($output, $phpcs_process, $project_name);
 
