@@ -336,8 +336,18 @@ class EvaluateCommand extends Command
         $phpstan_process->wait();
         if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
-            $output->writeln("  <info>Deprecation errors</info>: {$phpstan_output->totals->errors}");
-            $output->writeln("  <info>Deprecation file errors</info>: {$phpstan_output->totals->file_errors}");
+            if ($phpstan_output->totals->errors >= 1) {
+                $output->writeln("  <info>Deprecation errors</info>: <error>{$phpstan_output->totals->errors}</error>");
+            }
+            else {
+                $output->writeln("  <info>Deprecation errors</info>: {$phpstan_output->totals->errors}");
+            }
+            if ($phpstan_output->totals->file_errors >= 1) {
+                $output->writeln("  <info>Deprecation file errors</info>: <error>{$phpstan_output->totals->file_errors}</error>");
+            }
+            else {
+                $output->writeln("  <info>Deprecation file errors</info>: {$phpstan_output->totals->file_errors}");
+            }
         }
         else {
             $output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
@@ -359,8 +369,18 @@ class EvaluateCommand extends Command
         $phpcs_process->wait();
         if ($phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
-            $output->writeln("  <info>Coding standards errors</info>: {$phpcs_output->totals->errors}");
-            $output->writeln("  <info>Coding standards warnings</info>: {$phpcs_output->totals->warnings}");
+            if ($phpcs_output->totals->errors >= 5) {
+                $output->writeln("  <info>Coding standards errors</info>: <error>{$phpcs_output->totals->errors}</error>");
+            }
+            else {
+                $output->writeln("  <info>Coding standards errors</info>: {$phpcs_output->totals->errors}");
+            }
+            if ($phpcs_output->totals->warnings >= 10) {
+                $output->writeln("  <info>Coding standards warnings</info>: <error>{$phpcs_output->totals->warnings}</error>");
+            }
+            else {
+                $output->writeln("  <info>Coding standards warnings</info>: {$phpcs_output->totals->warnings}");
+            }
         }
         else {
             $output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
@@ -395,7 +415,12 @@ class EvaluateCommand extends Command
             ['field_issue_version' => $version]);
         // @todo handle 0 issues edge case.
         $output->writeln("<info>Issue statistics</info> for <comment>$version</comment>");
-        $output->writeln("  <info>Total issues</info>:  " . $num_issues);
+        if ($num_issues >= 37) {
+            $output->writeln("  <info>Total issues</info>:   <error>$num_issues</error>");
+        }
+        else {
+            $output->writeln("  <info>Total issues</info>:   $num_issues");
+        }
         $output->writeln('  <info>By priority</info>:');
 
         $num_crit_issues = $this->countProjectIssues($project, [
@@ -403,31 +428,47 @@ class EvaluateCommand extends Command
             'field_issue_version' => $version
         ]);
         $percent_crit = $this->formatPercentage($num_crit_issues, $num_issues);
-        $output->writeln("    <info># critical</info>:  $num_crit_issues ($percent_crit%)");
+        if ($num_crit_issues >= 2) {
+            $output->writeln("    <info># critical</info>:  <error>$num_crit_issues</error> ($percent_crit%)");
+        }
+        else {
+            $output->writeln("    <info># critical</info>:  $num_crit_issues ($percent_crit%)");
+        }
 
         $num_major_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::MAJOR,
             'field_issue_version' => $version
         ]);
-        $percent_major = $this->formatPercentage($num_major_issues,
-            $num_issues);
-        $output->writeln("    <info># major</info>:     $num_major_issues ($percent_major%)");
+        $percent_major = $this->formatPercentage($num_major_issues, $num_issues);
+        if ($num_major_issues >= 5) {
+            $output->writeln("    <info># major</info>:     <error>$num_major_issues</error> ($percent_major%)");
+        } else {
+            $output->writeln("    <info># major</info>:     $num_major_issues ($percent_major%)");
+        }
+
 
         $num_normal_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::NORMAL,
             'field_issue_version' => $version
         ]);
-        $percent_normal = $this->formatPercentage($num_normal_issues,
-            $num_issues);
-        $output->writeln("    <info># normal</info>:    $num_normal_issues ($percent_normal%)");
+        $percent_normal = $this->formatPercentage($num_normal_issues,$num_issues);
+        if ($num_major_issues >= 10) {
+            $output->writeln("    <info># normal</info>:    <error>$num_normal_issues</error> ($percent_normal%)");
+        } else {
+            $output->writeln("    <info># normal</info>:    $num_normal_issues ($percent_normal%)");
+        }
 
         $num_minor_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::MINOR,
             'field_issue_version' => $version
         ]);
-        $percent_minor = $this->formatPercentage($num_minor_issues,
-            $num_issues);
-        $output->writeln("    <info># minor</info>:     $num_minor_issues ($percent_minor%)");
+        $percent_minor = $this->formatPercentage($num_minor_issues,$num_issues);
+
+        if ($num_major_issues >= 20) {
+            $output->writeln("    <info># minor</info>:     <error>$num_minor_issues</error> ($percent_minor%)");
+        } else {
+            $output->writeln("    <info># minor</info>:     $num_minor_issues ($percent_minor%)");
+        }
 
         $output->writeln("  <info>By category</info>:");
 
@@ -501,8 +542,19 @@ class EvaluateCommand extends Command
         $last_release = end($project_releases);
         $last_release_date = date('r', $last_release->created);
 
+        // Calculate days between releases.
+        $last_release_timestamp = strtotime($last_release_date);
+        $now = time();
+        $datediff = $now - $last_release_timestamp;
+        $days_since_last_release = round($datediff / (60 * 60 * 24));
+
         $output->writeln("<info># releases</info>:      $num_releases");
-        $output->writeln("<info>last release</info>:    $last_release_date");
+        if ( $days_since_last_release >= 90) {
+            $output->writeln("<info>last release</info>:    <error>$last_release_date</error>");
+        }
+        else {
+            $output->writeln("<info>last release</info>:    $last_release_date");
+        }
     }
 
     /**
@@ -519,7 +571,12 @@ class EvaluateCommand extends Command
     ): void {
         $output->writeln($project->title . ' (' . $project_name . ')');
         $output->writeln('<info>Downloads</info>:  ' . $project->field_download_count);
-        $output->writeln('<info>SA Coverage</info>:  ' . $project->field_security_advisory_coverage);
+        if ($project->field_security_advisory_coverage != 'covered') {
+            $output->writeln("<info>SA Coverage</info>:    <error>$project->field_security_advisory_coverage</error>");
+        }
+        else {
+            $output->writeln("<info>SA Coverage</info>:    $project->field_security_advisory_coverage");
+        }
         $output->writeln('<info>Starred</info>:  ' . count($project->flag_project_star_user));
         $output->writeln('<info>Usage</info>:  ' . $project->project_usage->{"$major_version"});
     }
