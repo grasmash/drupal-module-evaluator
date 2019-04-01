@@ -17,12 +17,21 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
+/**
+ * Class Priorities
+ * @package Grasmash\Evaluator
+ */
 abstract class Priorities {
     const CRITICAL = 400;
     const MAJOR = 300;
     const NORMAL = 200;
     const MINOR = 100;
 }
+
+/**
+ * Class Categories
+ * @package Grasmash\Evaluator
+ */
 abstract class Categories {
     const BUG_REPORT = 1;
     const TASK = 2;
@@ -31,6 +40,10 @@ abstract class Categories {
     const PLAN = 5;
 }
 
+/**
+ * Class Statuses
+ * @package Grasmash\Evaluator
+ */
 abstract class Statuses {
   const ACTIVE = 1;
   const FIXED = 2;
@@ -47,14 +60,27 @@ abstract class Statuses {
   const CLOSED_OUTDATED = 17;
   const CLOSE_CANNOT_REPRODUCE = 18;
 }
+
+/**
+ * Class Vocabularies
+ * @package Grasmash\Evaluator
+ */
 abstract class Vocabularies {
     const CORE_COMPATIBILITY = 6;
 }
 
+/**
+ * Class CoreCompatibilityTerms
+ * @package Grasmash\Evaluator
+ */
 abstract class CoreCompatibilityTerms {
     const DRUPAL_8X = 7234;
 }
 
+/**
+ * Class EvaluateCommand
+ * @package Grasmash\Evaluator
+ */
 class EvaluateCommand extends Command
 {
 
@@ -70,6 +96,12 @@ class EvaluateCommand extends Command
     /** @var string */
     protected $tmp;
 
+
+    protected $phpStanErrorThreshold = 1;
+    protected $phpStanFileErrorThreshold = 1;
+    protected $phpCsErrorThreshold = 5;
+    protected $phpCsWarningThreshold = 10;
+
     public function configure()
     {
         $this->setName('evaluate');
@@ -78,7 +110,7 @@ class EvaluateCommand extends Command
         $this->addOption('dev-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for issue statistics.');
         $this->addOption('stable-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for code analysis.');
         $this->addUsage('acquia_connector --dev-version=8.x-1.x-dev');
-        // @todo Assume major version, allow to be specified.
+        // @todo Allow major versions to be specified.
     }
 
     /**
@@ -237,9 +269,11 @@ class EvaluateCommand extends Command
     }
 
     /**
-     * @param $query
+     * @param array $query
      *
-     * @return mixed
+     * @return object
+     *
+     * @throws \Exception
      */
     protected function requestNode($query) {
         $client = $this->createGuzzleClient();
@@ -251,6 +285,7 @@ class EvaluateCommand extends Command
                 }
             ]);
         if ($response->getStatusCode() !== 200) {
+            // @todo Make this display even when not verbose.
             throw new \Exception("Request to $url failed, returned {$response->getStatusCode()} with reason: {$response->getReasonPhrase()}");
         }
         $body = $response->getBody()->getContents();
@@ -273,6 +308,7 @@ class EvaluateCommand extends Command
         $targz_filename = "$project_string.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
         $untarred_dirpath = "{$this->tmp}/$project_string";
+        // @todo Allow a clear cache option.
         if (!file_exists($targz_filepath) || getenv('COMPOSERIZE_DRUPAL_NO_CACHE') == true) {
             file_put_contents(
                 $targz_filepath,
@@ -293,7 +329,7 @@ class EvaluateCommand extends Command
     }
 
     /**
-     * @param $download_path
+     * @param string $download_path
      *
      * @return \Symfony\Component\Process\Process
      */
@@ -305,7 +341,7 @@ class EvaluateCommand extends Command
     }
 
     /**
-     * @param $command
+     * @param string $command
      *
      * @return \Symfony\Component\Process\Process
      */
@@ -330,14 +366,15 @@ class EvaluateCommand extends Command
      */
     protected function endPhpStan(
         OutputInterface $output,
-        $phpstan_process,
+        Process $phpstan_process,
         $project_name
     ): void {
+
         $phpstan_process->wait();
         if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
-            $output->writeln("  <info>Deprecation errors</info>: {$phpstan_output->totals->errors}");
-            $output->writeln("  <info>Deprecation file errors</info>: {$phpstan_output->totals->file_errors}");
+            $this->printMetric("Deprecation errors", $phpstan_output->totals->errors, $this->phpStanErrorThreshold);
+            $this->printMetric("Deprecation file errors", $phpstan_output->totals->file_errors, $this->phpStanFileErrorThreshold);
         }
         else {
             $output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
@@ -347,9 +384,9 @@ class EvaluateCommand extends Command
 
     /**
      * @param \Symfony\Component\Console\Output\OutputInterface $output
-     * @param $phpcs_process
-     * @param $project_name
-     * @param $phpstan_process
+     * @param Process $phpcs_process
+     * @param string $project_name
+     * @param Process $phpstan_process
      */
     protected function endPhpCs(
         OutputInterface $output,
@@ -359,8 +396,8 @@ class EvaluateCommand extends Command
         $phpcs_process->wait();
         if ($phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
-            $output->writeln("  <info>Coding standards errors</info>: {$phpcs_output->totals->errors}");
-            $output->writeln("  <info>Coding standards warnings</info>: {$phpcs_output->totals->warnings}");
+            $this->printMetric("Coding standards errors", $phpcs_output->totals->errors, $this->phpCsErrorThreshold);
+            $this->printMetric("Coding standards warnings", $phpcs_output->totals->warnings, $this->phpCsWarningThreshold);
         }
         else {
             $output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
@@ -403,7 +440,7 @@ class EvaluateCommand extends Command
             'field_issue_version' => $version
         ]);
         $percent_crit = $this->formatPercentage($num_crit_issues, $num_issues);
-        $output->writeln("    <info># critical</info>:  $num_crit_issues ($percent_crit%)");
+        $this->printMetric("    # critical", $num_crit_issues, 2, "($percent_crit%)");
 
         $num_major_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::MAJOR,
@@ -411,7 +448,7 @@ class EvaluateCommand extends Command
         ]);
         $percent_major = $this->formatPercentage($num_major_issues,
             $num_issues);
-        $output->writeln("    <info># major</info>:     $num_major_issues ($percent_major%)");
+        $this->printMetric("    # major", $num_major_issues, 5, "($percent_major%)");
 
         $num_normal_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::NORMAL,
@@ -419,7 +456,7 @@ class EvaluateCommand extends Command
         ]);
         $percent_normal = $this->formatPercentage($num_normal_issues,
             $num_issues);
-        $output->writeln("    <info># normal</info>:    $num_normal_issues ($percent_normal%)");
+        $this->printMetric("    # normal", $num_normal_issues, 10, "($percent_normal%)");
 
         $num_minor_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::MINOR,
@@ -427,7 +464,7 @@ class EvaluateCommand extends Command
         ]);
         $percent_minor = $this->formatPercentage($num_minor_issues,
             $num_issues);
-        $output->writeln("    <info># minor</info>:     $num_minor_issues ($percent_minor%)");
+        $this->printMetric("    # minor", $num_minor_issues, 20, "($percent_minor%)");
 
         $output->writeln("  <info>By category</info>:");
 
@@ -486,6 +523,18 @@ class EvaluateCommand extends Command
             }
 
             $output->writeln("  <info>Last \"Closed (fixed)\"</info>:  $latest_issue_date");
+
+            $query = [
+                'field_project' => $project->nid,
+                'type' => 'project_issue',
+                'field_issue_status' => Statuses::RTBC,
+                'sort' => 'changed',
+                'direction' => 'DESC',
+            ];
+            $response_object = $this->requestNode($query);
+            $num_rtbc = count($response_object->list);
+            $output->writeln("  <info># RTCB</info>:  $num_rtbc");
+
         }
     }
 
@@ -500,9 +549,13 @@ class EvaluateCommand extends Command
         $num_releases = count($project_releases);
         $last_release = end($project_releases);
         $last_release_date = date('r', $last_release->created);
+        $now = time();
+        $datediff = $now - $last_release->created;
+        $days_since_last_release = round($datediff / (60 * 60 * 24));
 
         $output->writeln("<info># releases</info>:      $num_releases");
         $output->writeln("<info>last release</info>:    $last_release_date");
+        $this->printMetric("days since release", $days_since_last_release, 90, "days ago");
     }
 
     /**
@@ -519,7 +572,15 @@ class EvaluateCommand extends Command
     ): void {
         $output->writeln($project->title . ' (' . $project_name . ')');
         $output->writeln('<info>Downloads</info>:  ' . $project->field_download_count);
-        $output->writeln('<info>SA Coverage</info>:  ' . $project->field_security_advisory_coverage);
+
+        if ($project->field_security_advisory_coverage == 'covered') {
+            $message_type = 'info';
+        }
+        else {
+            $message_type = 'error';
+        }
+        $output->writeln("<$message_type>SA Coverage</$message_type>:  " . $project->field_security_advisory_coverage);
+
         $output->writeln('<info>Starred</info>:  ' . count($project->flag_project_star_user));
         $output->writeln('<info>Usage</info>:  ' . $project->project_usage->{"$major_version"});
     }
@@ -596,6 +657,19 @@ class EvaluateCommand extends Command
         if (!isset($dev_version)) {
             throw new \Exception("Unable to find development release for $project_name for Drupal major version $major_version.");
         }
+    }
+
+    /**
+     * @param $label
+     * @param $value
+     * @param $threshold
+     */
+    protected function printMetric($label, $value, $threshold, $suffix = '') {
+        $message_type = 'info';
+        if ($value >= $threshold) {
+            $message_type = 'error';
+        }
+        $this->output->writeln("<$message_type>$label</$message_type>: $value $suffix");
     }
 
 }
