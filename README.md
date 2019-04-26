@@ -1,6 +1,8 @@
 <!--
 [![Build Status](https://travis-ci.org/grasmash/composerize-drupal.svg?branch=master)](https://travis-ci.org/grasmash/composerize-drupal) [![Coverage Status](https://coveralls.io/repos/github/grasmash/composerize-drupal/badge.svg?branch=master)](https://coveralls.io/github/grasmash/composerize-drupal?branch=master) [![Packagist](https://img.shields.io/packagist/v/grasmash/composerize-drupal.svg)](https://packagist.org/packages/grasmash/composerize-drupal)
 -->
+# Overview
+This script scans Drupal.org to gather information about modules and report status for health evaluation. Follow the instructions below to run the script. The output example will provide the data and scoring example tells you how to interpret it for the module health evaluation.
 
 # Module Evaluator
 
@@ -44,5 +46,31 @@ Code Analysis for 8.x-1.16:
 ```
 
 ## Scoring
+Each module will be scored based on a number of objective criteria relating to:
+- Code Quality
+- Compliance
+- Customer Responsiveness
+- Ownership
+- Release Cadence
+- Security
 
+The scoring itself is tracked in a spreadsheet where each module has a tab to be filled out, and a report tab which is generated automatically. See this document:
+https://docs.google.com/spreadsheets/d/1iySyGQGs_G59O3hkBxRCX6fPXlVTnnXAyffCrbTVXqw/edit#gid=1023805792
 
+The data compiled in the example above is meant to contribute data automatically for you to use to evaluate the following elements in the Module Health Score:
+
+1. Code Quality
+- Module meets drupal coding standards with zero warnings or errors (PHP cs)
+- Module has less than X deprecation issues (PHPStan)
+
+2. Customer Responsiveness
+- Community major flagged issues exist
+- Community critical flagged issues exist
+
+3. Ownership
+- Modules should have public-facing documentation page on docs.acquia.com which links to the d.o corresponding module page.
+
+4. Security
+- Module with >1k installs must be marked stable and opt in to security team coverage
+
+More elements may be automated later, if you'd like to contribute to this project by automating other data points we are collecting in the spreadsheet, we encourage forking the project to add them.
