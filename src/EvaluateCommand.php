@@ -158,7 +158,6 @@ class EvaluateCommand extends Command
             $default_query = [
                 'field_project' => $project->nid,
                 'type' => 'project_issue',
-                //'taxonomy_vocabulary_6' => 7234, // 8.x core compatibility.
             ];
             $query = array_merge($default_query, $query);
             $response_object = $this->requestNode($query);
@@ -392,7 +391,7 @@ class EvaluateCommand extends Command
     ): void {
         // Determine version to filter on.
         // @todo Only count issues that are not closed!
-        $num_issues = $this->countProjectIssues(
+        $num_issues = $this->countOpenIssues(
             $project,
             ['field_issue_version' => $version]
         );
@@ -401,14 +400,15 @@ class EvaluateCommand extends Command
         $output->writeln("  <info>Total issues</info>:  " . $num_issues);
         $output->writeln('  <info>By priority</info>:');
 
-        $num_crit_issues = $this->countProjectIssues($project, [
+        $num_crit_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::CRITICAL,
             'field_issue_version' => $version
         ]);
+
         $percent_crit = $this->formatPercentage($num_crit_issues, $num_issues);
         $this->printMetric("    # critical", $num_crit_issues, 2, "($percent_crit%)");
 
-        $num_major_issues = $this->countProjectIssues($project, [
+        $num_major_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::MAJOR,
             'field_issue_version' => $version
         ]);
@@ -418,7 +418,7 @@ class EvaluateCommand extends Command
         );
         $this->printMetric("    # major", $num_major_issues, 5, "($percent_major%)");
 
-        $num_normal_issues = $this->countProjectIssues($project, [
+        $num_normal_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::NORMAL,
             'field_issue_version' => $version
         ]);
@@ -428,7 +428,7 @@ class EvaluateCommand extends Command
         );
         $this->printMetric("    # normal", $num_normal_issues, 10, "($percent_normal%)");
 
-        $num_minor_issues = $this->countProjectIssues($project, [
+        $num_minor_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::MINOR,
             'field_issue_version' => $version
         ]);
@@ -440,14 +440,14 @@ class EvaluateCommand extends Command
 
         $output->writeln("  <info>By category</info>:");
 
-        $num_bug_issues = $this->countProjectIssues($project, [
+        $num_bug_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::BUG_REPORT,
             'field_issue_version' => $version
         ]);
         $percent_bugs = $this->formatPercentage($num_bug_issues, $num_issues);
         $output->writeln("    <info># bug</info>:       $num_bug_issues ($percent_bugs%)");
 
-        $num_feature_issues = $this->countProjectIssues($project, [
+        $num_feature_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::FEATURE_REQUEST,
             'field_issue_version' => $version
         ]);
@@ -457,7 +457,7 @@ class EvaluateCommand extends Command
         );
         $output->writeln("    <info># feature</info>:   $num_feature_issues ($percent_features%)");
 
-        $num_support_issues = $this->countProjectIssues($project, [
+        $num_support_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::SUPPORT_REQUEST,
             'field_issue_version' => $version
         ]);
@@ -467,14 +467,14 @@ class EvaluateCommand extends Command
         );
         $output->writeln("    <info># support</info>:   $num_support_issues ($percent_support%)");
 
-        $num_task_issues = $this->countProjectIssues($project, [
+        $num_task_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::TASK,
             'field_issue_version' => $version
         ]);
         $percent_task = $this->formatPercentage($num_task_issues, $num_issues);
         $output->writeln("    <info># task</info>:      $num_task_issues ($percent_task%)");
 
-        $num_plan_issues = $this->countProjectIssues($project, [
+        $num_plan_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::PLAN,
             'field_issue_version' => $version
         ]);
@@ -648,5 +648,20 @@ class EvaluateCommand extends Command
             $message_type = 'error';
         }
         $this->output->writeln("<$message_type>$label</$message_type>: $value $suffix");
+    }
+
+    /**
+     * @param $project
+     * @param array $priority
+     *
+     * @return int
+     */
+    protected function countOpenIssues($project, array $query = []): int {
+        $num_crit_issues = 0;
+        foreach (Statuses::getOpenStatuses() as $status) {
+            $query['field_issue_status'] = $status;
+            $num_crit_issues += $this->countProjectIssues($project, $query);
+        }
+        return $num_crit_issues;
     }
 }
