@@ -4,6 +4,11 @@ namespace Grasmash\Evaluator;
 
 use Alchemy\Zippy\Zippy;
 use Doctrine\Common\Cache\FilesystemCache;
+use Grasmash\Evaluator\DrupalOrgData\Categories;
+use Grasmash\Evaluator\DrupalOrgData\CoreCompatibilityTerms;
+use Grasmash\Evaluator\DrupalOrgData\Priorities;
+use Grasmash\Evaluator\DrupalOrgData\Statuses;
+use Grasmash\Evaluator\DrupalOrgData\Vocabularies;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\TransferStats;
@@ -18,72 +23,11 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
 /**
- * Class Priorities
- * @package Grasmash\Evaluator
- */
-abstract class Priorities {
-    const CRITICAL = 400;
-    const MAJOR = 300;
-    const NORMAL = 200;
-    const MINOR = 100;
-}
-
-/**
- * Class Categories
- * @package Grasmash\Evaluator
- */
-abstract class Categories {
-    const BUG_REPORT = 1;
-    const TASK = 2;
-    const FEATURE_REQUEST = 3;
-    const SUPPORT_REQUEST = 4;
-    const PLAN = 5;
-}
-
-/**
- * Class Statuses
- * @package Grasmash\Evaluator
- */
-abstract class Statuses {
-  const ACTIVE = 1;
-  const FIXED = 2;
-  const CLOSED_DUPLICATE = 3;
-  const POSTPONED = 4;
-  const CLOSED_WONT_FIX = 5;
-  const CLOSED_WORKS_AS_DESIGNED = 6;
-  const CLOSED_FIXED = 7;
-  const NEEDS_REVIEW = 8;
-  const NEEDS_WORK = 13;
-  const RTBC = 14;
-  const PATCH_TO_BE_PORTED = 15;
-  const POSTPONED_NEED_INFO = 16;
-  const CLOSED_OUTDATED = 17;
-  const CLOSE_CANNOT_REPRODUCE = 18;
-}
-
-/**
- * Class Vocabularies
- * @package Grasmash\Evaluator
- */
-abstract class Vocabularies {
-    const CORE_COMPATIBILITY = 6;
-}
-
-/**
- * Class CoreCompatibilityTerms
- * @package Grasmash\Evaluator
- */
-abstract class CoreCompatibilityTerms {
-    const DRUPAL_8X = 7234;
-}
-
-/**
  * Class EvaluateCommand
  * @package Grasmash\Evaluator
  */
 class EvaluateCommand extends Command
 {
-
     /** @var InputInterface */
     protected $input;
 
@@ -96,10 +40,21 @@ class EvaluateCommand extends Command
     /** @var string */
     protected $tmp;
 
-
+    /**
+     * @var int
+     */
     protected $phpStanErrorThreshold = 1;
+    /**
+     * @var int
+     */
     protected $phpStanFileErrorThreshold = 1;
+    /**
+     * @var int
+     */
     protected $phpCsErrorThreshold = 5;
+    /**
+     * @var int
+     */
     protected $phpCsWarningThreshold = 10;
 
     public function configure()
@@ -136,23 +91,28 @@ class EvaluateCommand extends Command
         $this->tmp = sys_get_temp_dir();
 
         $project = $this->getProject($project_name);
-        $this->summarizeProjectMetadata($output, $project, $project_name,
-            $major_version);
+        $this->summarizeProjectMetadata(
+            $output,
+            $project,
+            $project_name,
+            $major_version
+        );
 
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
         if ($input->getOption('dev-version')) {
             $dev_version = $input->getOption('dev-version');
-        }
-        else {
-            $dev_version = $this->determineDevRelease($project_releases,
-                $major_version, $project_name);
+        } else {
+            $dev_version = $this->determineDevRelease(
+                $project_releases,
+                $major_version,
+                $project_name
+            );
         }
 
         if ($input->getOption('stable-version')) {
             $recommended_version = $input->getOption('stable-version');
-        }
-        else {
+        } else {
             $recommended_version = $this->determineRecommendedRelease($project_releases, $major_version, $project_name);
         }
 
@@ -192,7 +152,8 @@ class EvaluateCommand extends Command
      *
      * @return int
      */
-    protected function countProjectIssues($project, $query = []) {
+    protected function countProjectIssues($project, $query = [])
+    {
         if ($project->field_project_has_issue_queue) {
             $default_query = [
                 'field_project' => $project->nid,
@@ -215,13 +176,11 @@ class EvaluateCommand extends Command
                 ]);
                 $list_count = count($response_object->list);
                 $num_issues = (($num_pages - 1) * 100) + $list_count;
-            }
-            else {
+            } else {
                 $num_issues = count($response_object->list);
             }
             return $num_issues;
-        }
-        else {
+        } else {
             return 0;
         }
     }
@@ -233,7 +192,8 @@ class EvaluateCommand extends Command
      *
      * @return array
      */
-    protected function getProjectReleases($project, $core_compatibility) {
+    protected function getProjectReleases($project, $core_compatibility)
+    {
         // Maybe use a different endpoint?
         // @see https://updates.drupal.org/release-history/ctools/8.x
         if ($project->field_project_has_releases) {
@@ -243,8 +203,7 @@ class EvaluateCommand extends Command
                 'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
             ]);
             return $response_object->list;
-        }
-        else {
+        } else {
             return [];
         }
     }
@@ -252,7 +211,8 @@ class EvaluateCommand extends Command
     /**
      * @return \GuzzleHttp\Client
      */
-    protected function createGuzzleClient() {
+    protected function createGuzzleClient()
+    {
         $stack = HandlerStack::create();
         $stack->push(
             new CacheMiddleware(
@@ -275,15 +235,19 @@ class EvaluateCommand extends Command
      *
      * @throws \Exception
      */
-    protected function requestNode($query) {
+    protected function requestNode($query)
+    {
         $client = $this->createGuzzleClient();
-        $response = $client->request('GET',
-            'https://www.drupal.org/api-d7/node.json', [
+        $response = $client->request(
+            'GET',
+            'https://www.drupal.org/api-d7/node.json',
+            [
                 'query' => $query,
                 'on_stats' => function (TransferStats $stats) use (&$url) {
                     $url = $stats->getEffectiveUri();
                 }
-            ]);
+            ]
+        );
         if ($response->getStatusCode() !== 200) {
             // @todo Make this display even when not verbose.
             throw new \Exception("Request to $url failed, returned {$response->getStatusCode()} with reason: {$response->getReasonPhrase()}");
@@ -299,7 +263,8 @@ class EvaluateCommand extends Command
      *
      * @return string
      */
-    protected function formatPercentage($numerator, $denominator) {
+    protected function formatPercentage($numerator, $denominator)
+    {
         return number_format($numerator / $denominator * 100, 2);
     }
 
@@ -337,7 +302,7 @@ class EvaluateCommand extends Command
         $download_path
     ): \Symfony\Component\Process\Process {
         $command = "./vendor/bin/phpstan analyse '$download_path' --error-format=json --no-progress";
-    return $this->startProcess($command);
+        return $this->startProcess($command);
     }
 
     /**
@@ -375,8 +340,7 @@ class EvaluateCommand extends Command
             $phpstan_output = json_decode($phpstan_process->getOutput());
             $this->printMetric("Deprecation errors", $phpstan_output->totals->errors, $this->phpStanErrorThreshold);
             $this->printMetric("Deprecation file errors", $phpstan_output->totals->file_errors, $this->phpStanFileErrorThreshold);
-        }
-        else {
+        } else {
             $output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
             $output->write($phpstan_process->getErrorOutput());
         }
@@ -398,8 +362,7 @@ class EvaluateCommand extends Command
             $phpcs_output = json_decode($phpcs_process->getOutput());
             $this->printMetric("Coding standards errors", $phpcs_output->totals->errors, $this->phpCsErrorThreshold);
             $this->printMetric("Coding standards warnings", $phpcs_output->totals->warnings, $this->phpCsWarningThreshold);
-        }
-        else {
+        } else {
             $output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
             $output->write($phpcs_process->getErrorOutput());
         }
@@ -411,7 +374,8 @@ class EvaluateCommand extends Command
      * @return \Symfony\Component\Process\Process
      */
     protected function startPhpCs($download_path
-    ): \Symfony\Component\Process\Process {
+    ): \Symfony\Component\Process\Process
+    {
         $phpcs_process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json");
         return $phpcs_process;
     }
@@ -428,8 +392,10 @@ class EvaluateCommand extends Command
     ): void {
         // Determine version to filter on.
         // @todo Only count issues that are not closed!
-        $num_issues = $this->countProjectIssues($project,
-            ['field_issue_version' => $version]);
+        $num_issues = $this->countProjectIssues(
+            $project,
+            ['field_issue_version' => $version]
+        );
         // @todo handle 0 issues edge case.
         $output->writeln("<info>Issue statistics</info> for <comment>$version</comment>");
         $output->writeln("  <info>Total issues</info>:  " . $num_issues);
@@ -446,24 +412,30 @@ class EvaluateCommand extends Command
             'field_issue_priority' => Priorities::MAJOR,
             'field_issue_version' => $version
         ]);
-        $percent_major = $this->formatPercentage($num_major_issues,
-            $num_issues);
+        $percent_major = $this->formatPercentage(
+            $num_major_issues,
+            $num_issues
+        );
         $this->printMetric("    # major", $num_major_issues, 5, "($percent_major%)");
 
         $num_normal_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::NORMAL,
             'field_issue_version' => $version
         ]);
-        $percent_normal = $this->formatPercentage($num_normal_issues,
-            $num_issues);
+        $percent_normal = $this->formatPercentage(
+            $num_normal_issues,
+            $num_issues
+        );
         $this->printMetric("    # normal", $num_normal_issues, 10, "($percent_normal%)");
 
         $num_minor_issues = $this->countProjectIssues($project, [
             'field_issue_priority' => Priorities::MINOR,
             'field_issue_version' => $version
         ]);
-        $percent_minor = $this->formatPercentage($num_minor_issues,
-            $num_issues);
+        $percent_minor = $this->formatPercentage(
+            $num_minor_issues,
+            $num_issues
+        );
         $this->printMetric("    # minor", $num_minor_issues, 20, "($percent_minor%)");
 
         $output->writeln("  <info>By category</info>:");
@@ -479,16 +451,20 @@ class EvaluateCommand extends Command
             'field_issue_category' => Categories::FEATURE_REQUEST,
             'field_issue_version' => $version
         ]);
-        $percent_features = $this->formatPercentage($num_feature_issues,
-            $num_issues);
+        $percent_features = $this->formatPercentage(
+            $num_feature_issues,
+            $num_issues
+        );
         $output->writeln("    <info># feature</info>:   $num_feature_issues ($percent_features%)");
 
         $num_support_issues = $this->countProjectIssues($project, [
             'field_issue_category' => Categories::SUPPORT_REQUEST,
             'field_issue_version' => $version
         ]);
-        $percent_support = $this->formatPercentage($num_support_issues,
-            $num_issues);
+        $percent_support = $this->formatPercentage(
+            $num_support_issues,
+            $num_issues
+        );
         $output->writeln("    <info># support</info>:   $num_support_issues ($percent_support%)");
 
         $num_task_issues = $this->countProjectIssues($project, [
@@ -517,8 +493,7 @@ class EvaluateCommand extends Command
             if (count($response_object->list)) {
                 $latest_issue = $response_object->list[0];
                 $latest_issue_date = date('r', $latest_issue->changed);
-            }
-            else {
+            } else {
                 $latest_issue_date = 'never';
             }
 
@@ -534,7 +509,6 @@ class EvaluateCommand extends Command
             $response_object = $this->requestNode($query);
             $num_rtbc = count($response_object->list);
             $output->writeln("  <info># RTCB</info>:  $num_rtbc");
-
         }
     }
 
@@ -575,8 +549,7 @@ class EvaluateCommand extends Command
 
         if ($project->field_security_advisory_coverage == 'covered') {
             $message_type = 'info';
-        }
-        else {
+        } else {
             $message_type = 'error';
         }
         $output->writeln("<$message_type>SA Coverage</$message_type>:  " . $project->field_security_advisory_coverage);
@@ -591,7 +564,8 @@ class EvaluateCommand extends Command
      * @return mixed
      * @throws \Exception
      */
-    protected function getProject($project_name) {
+    protected function getProject($project_name)
+    {
         $response_object = $this->requestNode(['field_project_machine_name' => $project_name]);
         $list_count = count($response_object->list);
         if (!$list_count) {
@@ -613,16 +587,19 @@ class EvaluateCommand extends Command
     protected function determineRecommendedRelease(
         $project_releases,
         $major_version,
-        $project_name) {
+        $project_name
+    ) {
         // Stable releases are typically at the end of the array.
         $releases = array_reverse($project_releases);
         foreach ($releases as $project_release) {
-
             // If field_release_version_extra is null, then it is not a dev
             // alpha, beta, or rc release.
             if (is_null($project_release->field_release_version_extra)
-                && substr($project_release->field_release_version,
-                    0, 3) == $major_version) {
+                && substr(
+                    $project_release->field_release_version,
+                    0,
+                    3
+                ) == $major_version) {
                 $recommended_version = $project_release->field_release_version;
                 return $recommended_version;
             }
@@ -648,7 +625,7 @@ class EvaluateCommand extends Command
         // We're only querying dev versions. E.g., 8.x-3-x-dev.
         foreach ($project_releases as $project_release) {
             if ($project_release->field_release_version_extra
-                && substr($project_release->field_release_version,0, 3) == $major_version
+                && substr($project_release->field_release_version, 0, 3) == $major_version
                 && $project_release->field_release_version_extra == 'dev') {
                 $dev_version = $project_release->field_release_version;
                 return $dev_version;
@@ -664,12 +641,12 @@ class EvaluateCommand extends Command
      * @param $value
      * @param $threshold
      */
-    protected function printMetric($label, $value, $threshold, $suffix = '') {
+    protected function printMetric($label, $value, $threshold, $suffix = '')
+    {
         $message_type = 'info';
         if ($value >= $threshold) {
             $message_type = 'error';
         }
         $this->output->writeln("<$message_type>$label</$message_type>: $value $suffix");
     }
-
 }
