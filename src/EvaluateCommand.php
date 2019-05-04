@@ -123,6 +123,7 @@ class EvaluateCommand extends Command
         // Code analysis.
         $phpstan_process = $this->startPhpStan($download_path);
         $phpcs_process = $this->startPhpCs($download_path);
+        $composer_validate_process = $this->startComposerValidate();
 
         $this->summarizeIssues($output, $project, $dev_version);
         $this->summarizeReleases($output, $project_releases);
@@ -143,6 +144,7 @@ class EvaluateCommand extends Command
         $output->writeln("Code Analysis for <comment>$recommended_version</comment>:");
         $this->endPhpStan($output, $phpstan_process, $project_name);
         $this->endPhpCs($output, $phpcs_process, $project_name);
+        $this->endComposerValidate($output, $composer_validate_process);
 
         return 0;
     }
@@ -272,16 +274,13 @@ class EvaluateCommand extends Command
         $targz_filename = "$project_string.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
         $untarred_dirpath = "{$this->tmp}/$project_string";
-        // @todo Allow a clear cache option.
-        if (!file_exists($targz_filepath) || getenv('COMPOSERIZE_DRUPAL_NO_CACHE') == true) {
-            file_put_contents(
-                $targz_filepath,
-                fopen(
-                    "https://ftp.drupal.org/files/projects/$targz_filename",
-                    'r'
-                )
-            );
-        }
+        file_put_contents(
+            $targz_filepath,
+            fopen(
+                "https://ftp.drupal.org/files/projects/$targz_filename",
+                'r'
+            )
+        );
         if (!file_exists($untarred_dirpath)) {
             $this->fs->mkdir($untarred_dirpath);
             $zippy = Zippy::load();
@@ -368,6 +367,45 @@ class EvaluateCommand extends Command
     }
 
     /**
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param Process $process
+     * @param Process $phpstan_process
+     */
+    protected function endComposerValidate(
+        OutputInterface $output,
+        $process): void {
+        $process->wait();
+        $exit_code = $process->getExitCode();
+
+        switch ($exit_code) {
+            // Success.
+            case 0:
+                $output->writeln("<info>Composer validate</info>: passes.");
+                break;
+            case 1:
+                $output->writeln("<comment>Composer validate</comment>: warnings");
+                break;
+            case 2:
+                $output->writeln("<error>Composer validate</error>: errors");
+                break;
+            case 3:
+                $output->writeln("<error>Composer validate</error>: composer.json missing!");
+                break;
+        }
+    }
+
+    /**
+     * @param
+     *
+     * @return \Symfony\Component\Process\Process
+     */
+    protected function startComposerValidate(): \Symfony\Component\Process\Process
+    {
+        $process = $this->startProcess("composer validate --strict");
+        return $process;
+    }
+
+    /**
      * @param $download_path
      *
      * @return \Symfony\Component\Process\Process
@@ -375,8 +413,8 @@ class EvaluateCommand extends Command
     protected function startPhpCs($download_path
     ): \Symfony\Component\Process\Process
     {
-        $phpcs_process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json");
-        return $phpcs_process;
+        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json");
+        return $process;
     }
 
     /**
@@ -390,126 +428,44 @@ class EvaluateCommand extends Command
         $version
     ): void {
         // Determine version to filter on.
-        // @todo Only count issues that are not closed!
         $num_issues = $this->countOpenIssues(
             $project,
             ['field_issue_version' => $version]
         );
-        // @todo handle 0 issues edge case.
         $output->writeln("<info>Issue statistics</info> for <comment>$version</comment>");
         $output->writeln("  <info>Total issues</info>:  " . $num_issues);
-        $output->writeln('  <info>By priority</info>:');
 
-        $num_crit_issues = $this->countOpenIssues($project, [
-            'field_issue_priority' => Priorities::CRITICAL,
-            'field_issue_version' => $version
-        ]);
-
-        $percent_crit = $this->formatPercentage($num_crit_issues, $num_issues);
-        $this->printMetric("    # critical", $num_crit_issues, 2, "($percent_crit%)");
-
-        $num_major_issues = $this->countOpenIssues($project, [
-            'field_issue_priority' => Priorities::MAJOR,
-            'field_issue_version' => $version
-        ]);
-        $percent_major = $this->formatPercentage(
-            $num_major_issues,
-            $num_issues
-        );
-        $this->printMetric("    # major", $num_major_issues, 5, "($percent_major%)");
-
-        $num_normal_issues = $this->countOpenIssues($project, [
-            'field_issue_priority' => Priorities::NORMAL,
-            'field_issue_version' => $version
-        ]);
-        $percent_normal = $this->formatPercentage(
-            $num_normal_issues,
-            $num_issues
-        );
-        $this->printMetric("    # normal", $num_normal_issues, 10, "($percent_normal%)");
-
-        $num_minor_issues = $this->countOpenIssues($project, [
-            'field_issue_priority' => Priorities::MINOR,
-            'field_issue_version' => $version
-        ]);
-        $percent_minor = $this->formatPercentage(
-            $num_minor_issues,
-            $num_issues
-        );
-        $this->printMetric("    # minor", $num_minor_issues, 20, "($percent_minor%)");
-
-        $output->writeln("  <info>By category</info>:");
-
-        $num_bug_issues = $this->countOpenIssues($project, [
-            'field_issue_category' => Categories::BUG_REPORT,
-            'field_issue_version' => $version
-        ]);
-        $percent_bugs = $this->formatPercentage($num_bug_issues, $num_issues);
-        $output->writeln("    <info># bug</info>:       $num_bug_issues ($percent_bugs%)");
-
-        $num_feature_issues = $this->countOpenIssues($project, [
-            'field_issue_category' => Categories::FEATURE_REQUEST,
-            'field_issue_version' => $version
-        ]);
-        $percent_features = $this->formatPercentage(
-            $num_feature_issues,
-            $num_issues
-        );
-        $output->writeln("    <info># feature</info>:   $num_feature_issues ($percent_features%)");
-
-        $num_support_issues = $this->countOpenIssues($project, [
-            'field_issue_category' => Categories::SUPPORT_REQUEST,
-            'field_issue_version' => $version
-        ]);
-        $percent_support = $this->formatPercentage(
-            $num_support_issues,
-            $num_issues
-        );
-        $output->writeln("    <info># support</info>:   $num_support_issues ($percent_support%)");
-
-        $num_task_issues = $this->countOpenIssues($project, [
-            'field_issue_category' => Categories::TASK,
-            'field_issue_version' => $version
-        ]);
-        $percent_task = $this->formatPercentage($num_task_issues, $num_issues);
-        $output->writeln("    <info># task</info>:      $num_task_issues ($percent_task%)");
-
-        $num_plan_issues = $this->countOpenIssues($project, [
-            'field_issue_category' => Categories::PLAN,
-            'field_issue_version' => $version
-        ]);
-        $percent_plan = $this->formatPercentage($num_plan_issues, $num_issues);
-        $output->writeln("    <info># plan</info>:      $num_plan_issues ($percent_plan%)");
-
-        if ($project->field_project_has_issue_queue) {
-            $query = [
-                'field_project' => $project->nid,
-                'type' => 'project_issue',
-                'field_issue_status' => Statuses::CLOSED_FIXED,
-                'sort' => 'changed',
-                'direction' => 'DESC',
-            ];
-            $response_object = $this->requestNode($query);
-            if (count($response_object->list)) {
-                $latest_issue = $response_object->list[0];
-                $latest_issue_date = date('r', $latest_issue->changed);
-            } else {
-                $latest_issue_date = 'never';
-            }
-
-            $output->writeln("  <info>Last \"Closed (fixed)\"</info>:  $latest_issue_date");
-
-            $query = [
-                'field_project' => $project->nid,
-                'type' => 'project_issue',
-                'field_issue_status' => Statuses::RTBC,
-                'sort' => 'changed',
-                'direction' => 'DESC',
-            ];
-            $response_object = $this->requestNode($query);
-            $num_rtbc = count($response_object->list);
-            $output->writeln("  <info># RTCB</info>:  $num_rtbc");
+        if ($num_issues) {
+            $this->outputIssueStatistics($output, $project, $version, $num_issues);
         }
+        $query = [
+            'field_project' => $project->nid,
+            'type' => 'project_issue',
+            'field_issue_status' => Statuses::CLOSED_FIXED,
+            'sort' => 'changed',
+            'direction' => 'DESC',
+        ];
+        $response_object = $this->requestNode($query);
+        if (count($response_object->list)) {
+            $latest_issue = $response_object->list[0];
+            $latest_issue_date = date('r', $latest_issue->changed);
+        } else {
+            $latest_issue_date = 'never';
+        }
+
+        $output->writeln("  <info>Last \"Closed (fixed)\"</info>:  $latest_issue_date");
+
+        $query = [
+            'field_project' => $project->nid,
+            'type' => 'project_issue',
+            'field_issue_status' => Statuses::RTBC,
+            'sort' => 'changed',
+            'direction' => 'DESC',
+        ];
+        $response_object = $this->requestNode($query);
+        $num_rtbc = count($response_object->list);
+        // @todo Add limit!
+        $output->writeln("  <info># RTCB</info>:  $num_rtbc");
     }
 
     /**
@@ -663,5 +619,109 @@ class EvaluateCommand extends Command
             $num_crit_issues += $this->countProjectIssues($project, $query);
         }
         return $num_crit_issues;
+    }
+
+    /**
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param $project
+     * @param $version
+     * @param $num_issues
+     */
+    protected function outputIssueStatistics(
+        OutputInterface $output,
+        $project,
+        $version,
+        $num_issues
+    ): void {
+        $output->writeln('  <info>By priority</info>:');
+
+        $num_crit_issues = $this->countOpenIssues($project, [
+            'field_issue_priority' => Priorities::CRITICAL,
+            'field_issue_version' => $version
+        ]);
+
+        $percent_crit = $this->formatPercentage($num_crit_issues,
+            $num_issues);
+        $this->printMetric("    # critical", $num_crit_issues, 2,
+            "($percent_crit%)");
+
+        $num_major_issues = $this->countOpenIssues($project, [
+            'field_issue_priority' => Priorities::MAJOR,
+            'field_issue_version' => $version
+        ]);
+        $percent_major = $this->formatPercentage(
+            $num_major_issues,
+            $num_issues
+        );
+        $this->printMetric("    # major", $num_major_issues, 5,
+            "($percent_major%)");
+
+        $num_normal_issues = $this->countOpenIssues($project, [
+            'field_issue_priority' => Priorities::NORMAL,
+            'field_issue_version' => $version
+        ]);
+        $percent_normal = $this->formatPercentage(
+            $num_normal_issues,
+            $num_issues
+        );
+        $this->printMetric("    # normal", $num_normal_issues, 10,
+            "($percent_normal%)");
+
+        $num_minor_issues = $this->countOpenIssues($project, [
+            'field_issue_priority' => Priorities::MINOR,
+            'field_issue_version' => $version
+        ]);
+        $percent_minor = $this->formatPercentage(
+            $num_minor_issues,
+            $num_issues
+        );
+        $this->printMetric("    # minor", $num_minor_issues, 20,
+            "($percent_minor%)");
+
+        $output->writeln("  <info>By category</info>:");
+
+        $num_bug_issues = $this->countOpenIssues($project, [
+            'field_issue_category' => Categories::BUG_REPORT,
+            'field_issue_version' => $version
+        ]);
+        $percent_bugs = $this->formatPercentage($num_bug_issues,
+            $num_issues);
+        $output->writeln("    <info># bug</info>:       $num_bug_issues ($percent_bugs%)");
+
+        $num_feature_issues = $this->countOpenIssues($project, [
+            'field_issue_category' => Categories::FEATURE_REQUEST,
+            'field_issue_version' => $version
+        ]);
+        $percent_features = $this->formatPercentage(
+            $num_feature_issues,
+            $num_issues
+        );
+        $output->writeln("    <info># feature</info>:   $num_feature_issues ($percent_features%)");
+
+        $num_support_issues = $this->countOpenIssues($project, [
+            'field_issue_category' => Categories::SUPPORT_REQUEST,
+            'field_issue_version' => $version
+        ]);
+        $percent_support = $this->formatPercentage(
+            $num_support_issues,
+            $num_issues
+        );
+        $output->writeln("    <info># support</info>:   $num_support_issues ($percent_support%)");
+
+        $num_task_issues = $this->countOpenIssues($project, [
+            'field_issue_category' => Categories::TASK,
+            'field_issue_version' => $version
+        ]);
+        $percent_task = $this->formatPercentage($num_task_issues,
+            $num_issues);
+        $output->writeln("    <info># task</info>:      $num_task_issues ($percent_task%)");
+
+        $num_plan_issues = $this->countOpenIssues($project, [
+            'field_issue_category' => Categories::PLAN,
+            'field_issue_version' => $version
+        ]);
+        $percent_plan = $this->formatPercentage($num_plan_issues,
+            $num_issues);
+        $output->writeln("    <info># plan</info>:      $num_plan_issues ($percent_plan%)");
     }
 }
