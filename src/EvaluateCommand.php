@@ -3,6 +3,8 @@
 namespace Grasmash\Evaluator;
 
 use Alchemy\Zippy\Zippy;
+use Consolidation\OutputFormatters\StructuredData\PropertyList;
+use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Doctrine\Common\Cache\FilesystemCache;
 use Grasmash\Evaluator\DrupalOrgData\Categories;
 use Grasmash\Evaluator\DrupalOrgData\CoreCompatibilityTerms;
@@ -15,18 +17,18 @@ use GuzzleHttp\TransferStats;
 use Kevinrob\GuzzleCache\CacheMiddleware;
 use Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage;
 use Kevinrob\GuzzleCache\Strategy\PrivateCacheStrategy;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Class EvaluateCommand
  * @package Grasmash\Evaluator
  */
-class EvaluateCommand extends Command
+class EvaluateCommand
 {
     /** @var InputInterface */
     protected $input;
@@ -57,51 +59,109 @@ class EvaluateCommand extends Command
      */
     protected $phpCsWarningThreshold = 10;
 
-    public function configure()
-    {
-        $this->setName('evaluate');
-        $this->setDescription("Evaluate a contributed Drupal project.");
-        $this->addArgument('project', InputArgument::REQUIRED, 'The machine name of the project to evaluate.');
-        $this->addOption('dev-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for issue statistics.');
-        $this->addOption('stable-version', null, InputArgument::OPTIONAL, 'The dev version to evaluate. This is used for code analysis.');
-        $this->addUsage('acquia_connector --dev-version=8.x-1.x-dev');
-        // @todo Allow major versions to be specified.
+    /**
+     * @var ProgressBar
+     */
+    protected $progressBar;
+
+    /** @var \Symfony\Component\Console\Application */
+    protected $application;
+
+    public function __construct($application) {
+        $this->application = $application;
     }
 
     /**
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
-     * @throws \Exception
+     * @param $input
+     * @param $output
      */
-    public function execute(InputInterface $input, OutputInterface $output)
-    {
+    protected function setup($input, $output) {
+        $this->input = $input;
+        $this->output = $output;
+        $this->fs = new Filesystem();
+        $this->tmp = sys_get_temp_dir();
+    }
+
+    /**
+     * Evaluate a multiple contributed Drupal projects.
+     *
+     * @command evaluate-multiple
+     * @param string $file The file path to the yml file containing list of modules to evaluate.
+     * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
+     * @usage ./acquia.yml --format=csv
+     * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+     *   Exit code of the command.
+     */
+    public function evaluateMultiple(InputInterface $input, OutputInterface $output, $file, $options = [
+        'format' => 'table',
+    ]) {
+        $this->setup($input, $output);
+        $list = Yaml::parseFile($file);
+        $output_data = [];
+        foreach ($list as $name => $options) {
+            $default_options = [
+                'dev-version' => null,
+                'stable-version' => null,
+            ];
+            $options = array_merge($default_options, $options);
+            $command_output = $this->evaluate($input, $output, $name, $options);
+            $output_data[$name] = (array) $command_output;
+        }
+        return new RowsOfFields($output_data);
+    }
+
+    /**
+     * Evaluate a contributed Drupal project.
+     *
+     * @command evaluate
+     * @param string $project_name The machine name of the project to evaluate
+     * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
+     * @option dev-version The dev version to evaluate. This is used for issue statistics.
+     * @option stable-version The stable version to evaluate. This is used for code analysis.
+     * @usage acquia_connector --dev-version=8.x-1.x-dev
+     * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
+     *   Exit code of the command.
+     */
+    public function evaluate(InputInterface $input, OutputInterface $output, $project_name, $options = [
+        'format' => 'table',
+        'dev-version' => null,
+        'stable-version' => null,
+    ]) {
+        $this->setup($input, $output);
+        ProgressBar::setFormatDefinition('custom', 'Evaluating <comment>%module%</comment>:
+ %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%
+ %message%
+ ');
+        $this->progressBar = new ProgressBar($output, 21);
+        $this->progressBar->setFormat('custom');
+        $this->progressBar->setMessage('Starting...');
+        $this->progressBar->start();
+
         // @see https://www.drupal.org/drupalorg/docs/api
         // https://www.drupal.org/api-d7/node.json?field_project_machine_name=[project-name]
         // You can pass special meta controls to your query: limit, page, sort, and direction.
-
-        $this->input = $input;
-        $this->output = $output;
-        $project_name = $input->getArgument('project');
         // @todo Change this to a dynamic value from argument.
         $major_version = '8.x';
         $core_compatibility = CoreCompatibilityTerms::DRUPAL_8X;
-        $this->fs = new Filesystem();
-        $this->tmp = sys_get_temp_dir();
-
+        $this->progressBar->setMessage($project_name, 'module');
+        $this->progressBar->setMessage('Querying drupal.org for project metadata...');
+        $this->progressBar->advance();
         $project = $this->getProject($project_name);
-        $this->summarizeProjectMetadata(
-            $output,
-            $project,
-            $project_name,
-            $major_version
-        );
+        $metadata = [
+            'name' => $project_name,
+            'title' => $project->title,
+            'downloads' => $project->field_download_count,
+            'security_advisory_coverage' => $project->field_security_advisory_coverage,
+            'starred' => count($project->flag_project_star_user),
+            'usage' => $project->project_usage->{"$major_version"},
+        ];
 
+        $this->progressBar->setMessage('Querying drupal.org for project releases...');
+        $this->progressBar->advance();
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
-        if ($input->getOption('dev-version')) {
-            $dev_version = $input->getOption('dev-version');
+        if ($options['dev-version']) {
+            $dev_version = $options['dev-version'];
         } else {
             $dev_version = $this->determineDevRelease(
                 $project_releases,
@@ -109,24 +169,34 @@ class EvaluateCommand extends Command
                 $project_name
             );
         }
+        $metadata['dev-version'] = $dev_version;
 
-        if ($input->getOption('stable-version')) {
-            $recommended_version = $input->getOption('stable-version');
+        if ($options['stable-version']) {
+            $stable_version = $options['stable-version'];
         } else {
-            $recommended_version = $this->determineRecommendedRelease($project_releases, $major_version, $project_name);
+            $stable_version = $this->determineRecommendedRelease($project_releases, $major_version, $project_name);
         }
+        $metadata['stable-version'] = $stable_version;
 
         // Download module.
-        $project_string = $project_name . "-" . $recommended_version;
+        $this->progressBar->setMessage('Downloading project from Drupal.org...');
+        $this->progressBar->advance();
+        $project_string = $project_name . "-" . $stable_version;
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
         // Code analysis.
+        $this->progressBar->setMessage('Starting code analysis in background...');
+        $this->progressBar->advance();
         $phpstan_process = $this->startPhpStan($download_path);
         $phpcs_process = $this->startPhpCs($download_path);
         $composer_validate_process = $this->startComposerValidate();
 
-        $this->summarizeIssues($output, $project, $dev_version);
-        $this->summarizeReleases($output, $project_releases);
+        $this->progressBar->setMessage('Calculating issues statistics...');
+        $this->progressBar->advance();
+        $issue_stats = $this->summarizeIssues($project, $dev_version);
+        $this->progressBar->setMessage('Calculating release statistics...');
+        $this->progressBar->advance();
+        $release_stats = $this->summarizeReleases($project_releases);
 
         // Calculate a "maintenance health" score based on:
         // Average time for issue response.
@@ -141,12 +211,20 @@ class EvaluateCommand extends Command
         // $project = new ContribProject($response_object);
         // https://www.drupal.org/api-d7/node.json?type=project_issue&field_project=3060&taxonomy_vocabulary_9=187541
 
-        $output->writeln("Code Analysis for <comment>$recommended_version</comment>:");
-        $this->endPhpStan($output, $phpstan_process, $project_name);
-        $this->endPhpCs($output, $phpcs_process, $project_name);
-        $this->endComposerValidate($output, $composer_validate_process);
+        $phpstan_stats = $this->endPhpStan($phpstan_process, $project_name);
+        $phpcs_stats = $this->endPhpCs($phpcs_process, $project_name);
+        $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        return 0;
+        $output = array_merge(
+            $metadata,
+            $issue_stats,
+            $release_stats,
+            $phpstan_stats,
+            $phpcs_stats,
+            $composer_stats
+        );
+
+        return new PropertyList($output);
     }
 
     /**
@@ -323,75 +401,81 @@ class EvaluateCommand extends Command
     }
 
     /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param $phpstan_process
      * @param $project_name
      */
     protected function endPhpStan(
-        OutputInterface $output,
         Process $phpstan_process,
         $project_name
-    ): void {
-
+    ) {
+        $this->progressBar->setMessage('Waiting for phpstan to finish...');
+        $this->progressBar->advance();
         $phpstan_process->wait();
+        $output_data = [];
         if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
-            $this->printMetric("Deprecation errors", $phpstan_output->totals->errors, $this->phpStanErrorThreshold);
-            $this->printMetric("Deprecation file errors", $phpstan_output->totals->file_errors, $this->phpStanFileErrorThreshold);
+            $output_data['deprecation_errors'] = $phpstan_output->totals->errors;
+            $output_data['deprecation_file_errors'] = $phpstan_output->totals->file_errors;
         } else {
-            $output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
-            $output->write($phpstan_process->getErrorOutput());
+            $this->output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
+            $this->output->write($phpstan_process->getErrorOutput());
         }
+
+        return $output_data;
     }
 
     /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param Process $phpcs_process
      * @param string $project_name
      * @param Process $phpstan_process
      */
     protected function endPhpCs(
-        OutputInterface $output,
         $phpcs_process,
         $project_name
-    ): void {
+    ) {
+        $this->progressBar->setMessage('Waiting for phpcs to finish...');
+        $this->progressBar->advance();
         $phpcs_process->wait();
+        $output_data = [];
         if ($phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
-            $this->printMetric("Coding standards errors", $phpcs_output->totals->errors, $this->phpCsErrorThreshold);
-            $this->printMetric("Coding standards warnings", $phpcs_output->totals->warnings, $this->phpCsWarningThreshold);
+            $output_data['phpcs_errors'] = $phpcs_output->totals->errors;
+            $output_data['phpcs_warnings'] = $phpcs_output->totals->warnings;
         } else {
-            $output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
-            $output->write($phpcs_process->getErrorOutput());
+            $this->output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
+            $this->output->write($phpcs_process->getErrorOutput());
         }
+
+        return $output_data;
     }
 
     /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param Process $process
-     * @param Process $phpstan_process
      */
-    protected function endComposerValidate(
-        OutputInterface $output,
-        $process): void {
+    protected function endComposerValidate($process) {
+        $this->progressBar->setMessage('Waiting for composer to finish...');
+        $this->progressBar->advance();
         $process->wait();
         $exit_code = $process->getExitCode();
+        $output_data = [];
 
         switch ($exit_code) {
             // Success.
             case 0:
-                $output->writeln("<info>Composer validate</info>: passes.");
+                $output_data['composer_validate'] = 'passes';
                 break;
             case 1:
-                $output->writeln("<comment>Composer validate</comment>: warnings");
+                $output_data['composer_validate'] = 'warnings';
                 break;
             case 2:
-                $output->writeln("<error>Composer validate</error>: errors");
+                $output_data['composer_validate'] = 'errors';
                 break;
             case 3:
-                $output->writeln("<error>Composer validate</error>: composer.json missing!");
+                $output_data['composer_validate'] = 'null';
                 break;
         }
+
+        return $output_data;
     }
 
     /**
@@ -418,26 +502,42 @@ class EvaluateCommand extends Command
     }
 
     /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param $project
      * @param $version
      */
     protected function summarizeIssues(
-        OutputInterface $output,
         $project,
         $version
-    ): void {
+    ) {
         // Determine version to filter on.
+        $this->progressBar->setMessage('Counting total open issues...');
+        $this->progressBar->advance();
         $num_issues = $this->countOpenIssues(
             $project,
             ['field_issue_version' => $version]
         );
-        $output->writeln("<info>Issue statistics</info> for <comment>$version</comment>");
-        $output->writeln("  <info>Total issues</info>:  " . $num_issues);
-
+        $output_data['issues_total'] = $num_issues;
         if ($num_issues) {
-            $this->outputIssueStatistics($output, $project, $version, $num_issues);
+            $issue_stats = $this->outputIssueStatistics($project, $version);
+            $output_data = array_merge($output_data, $issue_stats);
         }
+
+        $this->progressBar->setMessage('Counting total rtbc issues...');
+        $this->progressBar->advance();
+        $query = [
+            'field_project' => $project->nid,
+            'type' => 'project_issue',
+            'field_issue_status' => Statuses::RTBC,
+            'sort' => 'changed',
+            'direction' => 'DESC',
+        ];
+        $response_object = $this->requestNode($query);
+        $num_rtbc = count($response_object->list);
+        // @todo Add limit!
+        $output_data['issues_status_rtbc'] = $num_rtbc;
+
+        $this->progressBar->setMessage('Finding last fixed issue...');
+        $this->progressBar->advance();
         $query = [
             'field_project' => $project->nid,
             'type' => 'project_issue',
@@ -452,30 +552,17 @@ class EvaluateCommand extends Command
         } else {
             $latest_issue_date = 'never';
         }
+        $output_data['issues_status_fixed_last'] = $latest_issue_date;
 
-        $output->writeln("  <info>Last \"Closed (fixed)\"</info>:  $latest_issue_date");
-
-        $query = [
-            'field_project' => $project->nid,
-            'type' => 'project_issue',
-            'field_issue_status' => Statuses::RTBC,
-            'sort' => 'changed',
-            'direction' => 'DESC',
-        ];
-        $response_object = $this->requestNode($query);
-        $num_rtbc = count($response_object->list);
-        // @todo Add limit!
-        $output->writeln("  <info># RTCB</info>:  $num_rtbc");
+        return $output_data;
     }
 
     /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param $project_releases
      */
     protected function summarizeReleases(
-        OutputInterface $output,
         $project_releases
-    ): void {
+    ) {
         $num_releases = count($project_releases);
         $last_release = end($project_releases);
         $last_release_date = date('r', $last_release->created);
@@ -483,35 +570,11 @@ class EvaluateCommand extends Command
         $datediff = $now - $last_release->created;
         $days_since_last_release = round($datediff / (60 * 60 * 24));
 
-        $output->writeln("<info># releases</info>:      $num_releases");
-        $output->writeln("<info>last release</info>:    $last_release_date");
-        $this->printMetric("days since release", $days_since_last_release, 90, "days ago");
-    }
+        $output_data['releases_total'] = $num_releases;
+        $output_data['releases_last'] = $last_release_date;
+        $output_data['releases_days_since'] = $days_since_last_release;
 
-    /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     * @param $project
-     * @param $project_name
-     * @param $major_version
-     */
-    protected function summarizeProjectMetadata(
-        OutputInterface $output,
-        $project,
-        $project_name,
-        $major_version
-    ): void {
-        $output->writeln($project->title . ' (' . $project_name . ')');
-        $output->writeln('<info>Downloads</info>:  ' . $project->field_download_count);
-
-        if ($project->field_security_advisory_coverage == 'covered') {
-            $message_type = 'info';
-        } else {
-            $message_type = 'error';
-        }
-        $output->writeln("<$message_type>SA Coverage</$message_type>:  " . $project->field_security_advisory_coverage);
-
-        $output->writeln('<info>Starred</info>:  ' . count($project->flag_project_star_user));
-        $output->writeln('<info>Usage</info>:  ' . $project->project_usage->{"$major_version"});
+        return $output_data;
     }
 
     /**
@@ -552,6 +615,17 @@ class EvaluateCommand extends Command
             // alpha, beta, or rc release.
             if (is_null($project_release->field_release_version_extra)
                 && substr(
+                    $project_release->field_release_version,
+                    0,
+                    3
+                ) == $major_version) {
+                $recommended_version = $project_release->field_release_version;
+                return $recommended_version;
+            }
+        }
+        // Otherwise, return a non-stable release.
+        foreach ($releases as $project_release) {
+            if (substr(
                     $project_release->field_release_version,
                     0,
                     3
@@ -622,106 +696,85 @@ class EvaluateCommand extends Command
     }
 
     /**
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param $project
      * @param $version
-     * @param $num_issues
      */
     protected function outputIssueStatistics(
-        OutputInterface $output,
         $project,
-        $version,
-        $num_issues
-    ): void {
-        $output->writeln('  <info>By priority</info>:');
-
+        $version
+    ) {
+        $this->progressBar->setMessage('Counting open critical issues...');
+        $this->progressBar->advance();
         $num_crit_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::CRITICAL,
             'field_issue_version' => $version
         ]);
+        $output_data['issues_priority_critical'] = $num_crit_issues;
 
-        $percent_crit = $this->formatPercentage($num_crit_issues,
-            $num_issues);
-        $this->printMetric("    # critical", $num_crit_issues, 2,
-            "($percent_crit%)");
-
+        $this->progressBar->setMessage('Counting open major issues...');
+        $this->progressBar->advance();
         $num_major_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::MAJOR,
             'field_issue_version' => $version
         ]);
-        $percent_major = $this->formatPercentage(
-            $num_major_issues,
-            $num_issues
-        );
-        $this->printMetric("    # major", $num_major_issues, 5,
-            "($percent_major%)");
+        $output_data['issues_priority_major'] = $num_major_issues;
 
+        $this->progressBar->setMessage('Counting open normal issues...');
+        $this->progressBar->advance();
         $num_normal_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::NORMAL,
             'field_issue_version' => $version
         ]);
-        $percent_normal = $this->formatPercentage(
-            $num_normal_issues,
-            $num_issues
-        );
-        $this->printMetric("    # normal", $num_normal_issues, 10,
-            "($percent_normal%)");
+        $output_data['issues_priority_normal'] = $num_normal_issues;
 
+        $this->progressBar->setMessage('Counting open minor issues...');
+        $this->progressBar->advance();
         $num_minor_issues = $this->countOpenIssues($project, [
             'field_issue_priority' => Priorities::MINOR,
             'field_issue_version' => $version
         ]);
-        $percent_minor = $this->formatPercentage(
-            $num_minor_issues,
-            $num_issues
-        );
-        $this->printMetric("    # minor", $num_minor_issues, 20,
-            "($percent_minor%)");
+        $output_data['issues_priority_minor'] = $num_minor_issues;
 
-        $output->writeln("  <info>By category</info>:");
-
+        $this->progressBar->setMessage('Counting open bug issues...');
+        $this->progressBar->advance();
         $num_bug_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::BUG_REPORT,
             'field_issue_version' => $version
         ]);
-        $percent_bugs = $this->formatPercentage($num_bug_issues,
-            $num_issues);
-        $output->writeln("    <info># bug</info>:       $num_bug_issues ($percent_bugs%)");
+        $output_data['issues_category_bug'] = $num_bug_issues;
 
+        $this->progressBar->setMessage('Counting open feature issues...');
+        $this->progressBar->advance();
         $num_feature_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::FEATURE_REQUEST,
             'field_issue_version' => $version
         ]);
-        $percent_features = $this->formatPercentage(
-            $num_feature_issues,
-            $num_issues
-        );
-        $output->writeln("    <info># feature</info>:   $num_feature_issues ($percent_features%)");
+        $output_data['issues_category_feature'] = $num_feature_issues;
 
+        $this->progressBar->setMessage('Counting open support issues...');
+        $this->progressBar->advance();
         $num_support_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::SUPPORT_REQUEST,
             'field_issue_version' => $version
         ]);
-        $percent_support = $this->formatPercentage(
-            $num_support_issues,
-            $num_issues
-        );
-        $output->writeln("    <info># support</info>:   $num_support_issues ($percent_support%)");
+        $output_data['issues_category_support'] = $num_support_issues;
 
+        $this->progressBar->setMessage('Counting open task issues...');
+        $this->progressBar->advance();
         $num_task_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::TASK,
             'field_issue_version' => $version
         ]);
-        $percent_task = $this->formatPercentage($num_task_issues,
-            $num_issues);
-        $output->writeln("    <info># task</info>:      $num_task_issues ($percent_task%)");
+        $output_data['issues_category_task'] = $num_task_issues;
 
+        $this->progressBar->setMessage('Counting open plan issues...');
+        $this->progressBar->advance();
         $num_plan_issues = $this->countOpenIssues($project, [
             'field_issue_category' => Categories::PLAN,
             'field_issue_version' => $version
         ]);
-        $percent_plan = $this->formatPercentage($num_plan_issues,
-            $num_issues);
-        $output->writeln("    <info># plan</info>:      $num_plan_issues ($percent_plan%)");
+        $output_data['issues_category_plan'] = $num_plan_issues;
+
+        return $output_data;
     }
 }
