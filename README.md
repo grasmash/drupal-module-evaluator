@@ -54,10 +54,7 @@ Each module will be scored based on a number of objective criteria relating to:
 - Release Cadence
 - Security
 
-The scoring itself is tracked in a spreadsheet where each module has a tab to be filled out, and a report tab which is generated automatically. See this document:
-https://docs.google.com/spreadsheets/d/1iySyGQGs_G59O3hkBxRCX6fPXlVTnnXAyffCrbTVXqw/edit#gid=1023805792
-
-The data compiled in the example above is meant to contribute data automatically for you to use to evaluate the following elements in the Module Health Score:
+The scoring itself is tracked in a report document per module. The data compiled in the example above is meant to contribute data automatically for you to use to evaluate the following elements in the Module Health Score:
 
 1. Code Quality
 - Module meets drupal coding standards with zero warnings or errors (PHP cs)
