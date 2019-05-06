@@ -13,34 +13,42 @@ composer install
 
 Example usage:
 ```
-$ ./bin/evaluate acquia_connector --dev-version=8.x-1.x-dev
+$ ./bin/evaluate evaluate acquia_connector --dev-version=8.x-1.x-dev
 
-Acquia Connector (acquia_connector)
-Downloads:  991665
-SA Coverage:  covered
-Starred:  10
-Usage:  9337
-Issue statistics for 8.x-1.x-dev
-  total issues:  68
-  By priority:
-    # critical:  5 (7.35%)
-    # major:     13 (19.12%)
-    # normal:    48 (70.59%)
-    # minor:     2 (2.94%)
-  By category:
-    # bug:       45 (66.18%)
-    # feature:   6 (8.82%)
-    # support:   4 (5.88%)
-    # task:      13 (19.12%)
-    # plan:      0 (0.00%)
-  Last "Closed (fixed)":  Thu, 28 Feb 2019 15:28:27 +0000
-# releases:      19
-last release:    Wed, 06 Feb 2019 18:09:19 +0000
-Code Analysis for 8.x-1.16:
-  Deprecation errors: 0
-  Deprecation file errors: 36
-  Coding standards errors: 640
-  Coding standards warnings: 81
+  -------------------------------- ---------------------------------
+  Name                             acquia_connector
+  Title                            Acquia Connector
+  Downloads                        1054587
+  Security Advisory Coverage       covered
+  Starred                          10
+  Usage                            9371
+  Dev version                      8.x-1.x-dev
+  Stable version                   8.x-1.16
+  Total issues                     33
+  Priority Critical Issues         2
+  Priority Major Issues            3
+  Priority Normal Issues           27
+  Priority Minor Issues            1
+  Priority Bug Issues              19
+  Category Feature Issues          4
+  Category Support Issues          3
+  Category Task Issues             7
+  Category Plan Issues             0
+  Status RTBC Issues               3
+  Last "Closed/fixed" issue date   Thu, 28 Feb 2019 15:28:27 +0000
+  Total releases                   19
+  Last release date                Wed, 06 Feb 2019 18:09:19 +0000
+  Days since last release          87
+  Deprecation errors               0
+  Deprecation file errors          36
+  PHPCS errors                     639
+  PHPCS warnings                   81
+  Composer validation status       warnings
+ -------------------------------- ---------------------------------
+```
+
+```
+./bin/evaluate evaluate-multiple ./acquia.yml --format=csv > acquia-modules.csv
 ```
 
 ## Scoring

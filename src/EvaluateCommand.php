@@ -67,6 +67,11 @@ class EvaluateCommand
     /** @var \Symfony\Component\Console\Application */
     protected $application;
 
+    /** @var int */
+    protected $score = 0;
+    /** @var int */
+    protected $total = 0;
+
     public function __construct($application) {
         $this->application = $application;
     }
@@ -98,14 +103,13 @@ class EvaluateCommand
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
         $output_data = [];
-        foreach ($list as $name => $options) {
+        foreach ($list as $key => $args) {
             $default_options = [
-                'dev-version' => null,
                 'stable-version' => null,
             ];
             $options = array_merge($default_options, $options);
-            $command_output = $this->evaluate($input, $output, $name, $options);
-            $output_data[$name] = (array) $command_output;
+            $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $options);
+            $output_data[] = (array) $command_output;
         }
         return new RowsOfFields($output_data);
     }
@@ -114,25 +118,59 @@ class EvaluateCommand
      * Evaluate a contributed Drupal project.
      *
      * @command evaluate
-     * @param string $project_name The machine name of the project to evaluate
+     * @param string $name The machine name of the project to evaluate
+     * @param string $branch The dev version to evaluate. This is used for issue statistics.
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
-     * @option dev-version The dev version to evaluate. This is used for issue statistics.
+     * @option major-version Either 7 or 8.
      * @option stable-version The stable version to evaluate. This is used for code analysis.
+     * @option fields Specify which fields are output.
+     * @field-labels
+     *   name: Name
+     *   title: Title
+     *   branch: Branch
+     *   downloads: Downloads
+     *   security_advisory_coverage: Security Advisory Coverage
+     *   starred: Starred
+     *   usage: Usage
+     *   recommended-version: Recommended version
+     *   is_stable: Is stable
+     *   issues_total: Total issues
+     *   issues_priority_critical: Priority Critical Issues
+     *   issues_priority_major: Priority Major Issues
+     *   issues_priority_normal: Priority Normal Issues
+     *   issues_priority_minor: Priority Minor Issues
+     *   issues_category_bug: Priority Bug Issues
+     *   issues_category_feature: Category Feature Issues
+     *   issues_category_support: Category Support Issues
+     *   issues_category_task: Category Task Issues
+     *   issues_category_plan: Category Plan Issues
+     *   issues_status_rtbc: Status RTBC Issues
+     *   issues_status_fixed_last: Last "Closed/fixed" issue date
+     *   releases_total: Total releases
+     *   releases_last: Last release date
+     *   releases_days_since: Days since last release
+     *   deprecation_errors: Deprecation errors
+     *   deprecation_file_errors: Deprecation file errors
+     *   phpcs_errors: PHPCS errors
+     *   phpcs_warnings: PHPCS warnings
+     *   composer_validate: Composer validation status
+     *   scored_points: Scored points
+     *   total_points: Total points
      * @usage acquia_connector --dev-version=8.x-1.x-dev
      * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
      *   Exit code of the command.
+     * @throws \Exception
      */
-    public function evaluate(InputInterface $input, OutputInterface $output, $project_name, $options = [
+    public function evaluate(InputInterface $input, OutputInterface $output, $name, $branch, $options = [
         'format' => 'table',
-        'dev-version' => null,
         'stable-version' => null,
     ]) {
         $this->setup($input, $output);
-        ProgressBar::setFormatDefinition('custom', 'Evaluating <comment>%module%</comment>:
+        ProgressBar::setFormatDefinition('custom', 'Evaluating <comment>%module%</comment>
  %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%
  %message%
  ');
-        $this->progressBar = new ProgressBar($output, 21);
+        $this->progressBar = new ProgressBar($output, 22);
         $this->progressBar->setFormat('custom');
         $this->progressBar->setMessage('Starting...');
         $this->progressBar->start();
@@ -140,16 +178,26 @@ class EvaluateCommand
         // @see https://www.drupal.org/drupalorg/docs/api
         // https://www.drupal.org/api-d7/node.json?field_project_machine_name=[project-name]
         // You can pass special meta controls to your query: limit, page, sort, and direction.
-        // @todo Change this to a dynamic value from argument.
-        $major_version = '8.x';
-        $core_compatibility = CoreCompatibilityTerms::DRUPAL_8X;
-        $this->progressBar->setMessage($project_name, 'module');
+        $major_version_int = substr($branch, 0, 1);
+        if ($major_version_int == 8) {
+            $core_compatibility = CoreCompatibilityTerms::DRUPAL_8X;
+        }
+        elseif ($major_version_int == 7){
+            $core_compatibility = CoreCompatibilityTerms::DRUPAL_7X;
+        }
+        else {
+            throw new \Exception("You must specify either a major version of either 7 or 8!");
+        }
+        $major_version = $major_version_int . '.x';
+
+        $this->progressBar->setMessage($name . ':' . $branch, 'module');
         $this->progressBar->setMessage('Querying drupal.org for project metadata...');
         $this->progressBar->advance();
-        $project = $this->getProject($project_name);
+        $project = $this->getProject($name);
         $metadata = [
-            'name' => $project_name,
+            'name' => $name,
             'title' => $project->title,
+            'branch' => $branch,
             'downloads' => $project->field_download_count,
             'security_advisory_coverage' => $project->field_security_advisory_coverage,
             'starred' => count($project->flag_project_star_user),
@@ -160,28 +208,22 @@ class EvaluateCommand
         $this->progressBar->advance();
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
-        if ($options['dev-version']) {
-            $dev_version = $options['dev-version'];
-        } else {
-            $dev_version = $this->determineDevRelease(
-                $project_releases,
-                $major_version,
-                $project_name
-            );
-        }
-        $metadata['dev-version'] = $dev_version;
-
         if ($options['stable-version']) {
-            $stable_version = $options['stable-version'];
+            $recommended_version = $options['stable-version'];
         } else {
-            $stable_version = $this->determineRecommendedRelease($project_releases, $major_version, $project_name);
+            $recommended_release = $this->findRecommendedRelease($project_releases, $major_version);
+            $recommended_version = $recommended_release->field_release_version;
+            if (!isset($recommended_version)) {
+                throw new \Exception("Unable to determine recommended release for $name for Drupal major version $major_version.");
+            }
         }
-        $metadata['stable-version'] = $stable_version;
+        $metadata['recommended-version'] = $recommended_version;
+        $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
-        $project_string = $project_name . "-" . $stable_version;
+        $project_string = $name . "-" . $recommended_version;
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
         // Code analysis.
@@ -193,29 +235,18 @@ class EvaluateCommand
 
         $this->progressBar->setMessage('Calculating issues statistics...');
         $this->progressBar->advance();
-        $issue_stats = $this->summarizeIssues($project, $dev_version);
+        $issue_stats = $this->summarizeIssues($project, $branch);
         $this->progressBar->setMessage('Calculating release statistics...');
         $this->progressBar->advance();
         $release_stats = $this->summarizeReleases($project_releases);
 
-        // Calculate a "maintenance health" score based on:
-        // Average time for issue response.
-        // % critical vs major vs minor.
-        // % bugs.
-        // Average time between releases.
-        // Maintenance status.
-        // Development status.
-        // SA Coverage
-        // # of uncommitted rtbcs.
-
-        // $project = new ContribProject($response_object);
-        // https://www.drupal.org/api-d7/node.json?type=project_issue&field_project=3060&taxonomy_vocabulary_9=187541
-
-        $phpstan_stats = $this->endPhpStan($phpstan_process, $project_name);
-        $phpcs_stats = $this->endPhpCs($phpcs_process, $project_name);
+        $phpstan_stats = $this->endPhpStan($phpstan_process, $name);
+        $phpcs_stats = $this->endPhpCs($phpcs_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        $output = array_merge(
+        $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml');
+
+        $output_data = array_merge(
             $metadata,
             $issue_stats,
             $release_stats,
@@ -224,7 +255,26 @@ class EvaluateCommand
             $composer_stats
         );
 
-        return new PropertyList($output);
+        $this->calculateScore($output_data);
+        $output_data['scored_points'] = $this->score;
+        $output_data['total_points'] = $this->total;
+
+        $this->progressBar->setMessage('Done!');
+        $this->progressBar->advance();
+
+        return new PropertyList($output_data);
+    }
+
+    /**
+     * @param $passes
+     * @param $scored_points
+     * @param $total_points
+     */
+    protected function scoreCriteria($passes, $scored_points, $total_points) {
+        if ($passes) {
+            $this->score += $scored_points;
+        }
+        $this->total += $total_points;
     }
 
     /**
@@ -598,16 +648,10 @@ class EvaluateCommand
     /**
      * @param $project_releases
      * @param $major_version
-     * @param $project_name
      *
-     * @throws \Exception
-     * @return string
+     * @return mixed
      */
-    protected function determineRecommendedRelease(
-        $project_releases,
-        $major_version,
-        $project_name
-    ) {
+    protected function findRecommendedRelease($project_releases, $major_version) {
         // Stable releases are typically at the end of the array.
         $releases = array_reverse($project_releases);
         foreach ($releases as $project_release) {
@@ -619,8 +663,7 @@ class EvaluateCommand
                     0,
                     3
                 ) == $major_version) {
-                $recommended_version = $project_release->field_release_version;
-                return $recommended_version;
+                return $project_release;
             }
         }
         // Otherwise, return a non-stable release.
@@ -630,12 +673,9 @@ class EvaluateCommand
                     0,
                     3
                 ) == $major_version) {
-                $recommended_version = $project_release->field_release_version;
-                return $recommended_version;
+                // @todo Check that minor version matches branch.
+                return $project_release;
             }
-        }
-        if (!isset($recommended_version)) {
-            throw new \Exception("Unable to determine recommended release for $project_name for Drupal major version $major_version.");
         }
     }
 
@@ -776,5 +816,23 @@ class EvaluateCommand
         $output_data['issues_category_plan'] = $num_plan_issues;
 
         return $output_data;
+    }
+
+    /**
+     * @param $output_data
+     */
+    protected function calculateScore($output_data): void {
+        $this->scoreCriteria($output_data['security_advisory_coverage'] == 'covered',
+            5, 5);
+        $this->scoreCriteria($output_data['is_stable'] == 'yes', 5, 5);
+        $this->scoreCriteria($output_data['issues_priority_critical'] == 0, 5, 5);
+        $this->scoreCriteria($output_data['issues_status_rtbc'] == 0, 5, 5);
+        $this->scoreCriteria($output_data['releases_days_since'] <= 90, 5, 5);
+        $this->scoreCriteria($output_data['deprecation_errors'] + $output_data['deprecation_file_errors'] == 0,
+            5, 5);
+        $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] == 0,
+            5, 5);
+        $this->scoreCriteria($output_data['composer_validate'] == 'passes', 5, 5);
+        $this->scoreCriteria($output_data['orca_integrated'] == 'passes', 5, 5);
     }
 }
