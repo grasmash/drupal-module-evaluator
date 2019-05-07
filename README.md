@@ -18,12 +18,13 @@ $ ./bin/evaluate evaluate acquia_connector --dev-version=8.x-1.x-dev
   -------------------------------- ---------------------------------
   Name                             acquia_connector
   Title                            Acquia Connector
-  Downloads                        1054587
+  Branch                           8.x-1.x-dev
+  Downloads                        1054770
   Security Advisory Coverage       covered
   Starred                          10
   Usage                            9371
-  Dev version                      8.x-1.x-dev
-  Stable version                   8.x-1.16
+  Recommended version              8.x-1.16
+  Is stable                        1
   Total issues                     33
   Priority Critical Issues         2
   Priority Major Issues            3
@@ -38,12 +39,14 @@ $ ./bin/evaluate evaluate acquia_connector --dev-version=8.x-1.x-dev
   Last "Closed/fixed" issue date   Thu, 28 Feb 2019 15:28:27 +0000
   Total releases                   19
   Last release date                Wed, 06 Feb 2019 18:09:19 +0000
-  Days since last release          87
+  Days since last release          88
   Deprecation errors               0
   Deprecation file errors          36
   PHPCS errors                     639
   PHPCS warnings                   81
   Composer validation status       warnings
+  Scored points                    15
+  Total points                     45
  -------------------------------- ---------------------------------
 ```
 

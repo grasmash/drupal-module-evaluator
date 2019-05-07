@@ -68,9 +68,9 @@ class EvaluateCommand
     protected $application;
 
     /** @var int */
-    protected $score = 0;
+    protected $score;
     /** @var int */
-    protected $total = 0;
+    protected $total;
 
     public function __construct($application) {
         $this->application = $application;
@@ -85,6 +85,8 @@ class EvaluateCommand
         $this->output = $output;
         $this->fs = new Filesystem();
         $this->tmp = sys_get_temp_dir();
+        $this->score = 0;
+        $this->total = 0;
     }
 
     /**
@@ -105,7 +107,7 @@ class EvaluateCommand
         $output_data = [];
         foreach ($list as $key => $args) {
             $default_options = [
-                'stable-version' => null,
+                'recommended-version' => null,
             ];
             $options = array_merge($default_options, $options);
             $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $options);
@@ -122,7 +124,7 @@ class EvaluateCommand
      * @param string $branch The dev version to evaluate. This is used for issue statistics.
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
      * @option major-version Either 7 or 8.
-     * @option stable-version The stable version to evaluate. This is used for code analysis.
+     * @option recommended-version The stable version to evaluate. This is used for code analysis.
      * @option fields Specify which fields are output.
      * @field-labels
      *   name: Name
@@ -163,7 +165,7 @@ class EvaluateCommand
      */
     public function evaluate(InputInterface $input, OutputInterface $output, $name, $branch, $options = [
         'format' => 'table',
-        'stable-version' => null,
+        'recommended-version' => null,
     ]) {
         $this->setup($input, $output);
         ProgressBar::setFormatDefinition('custom', 'Evaluating <comment>%module%</comment>
@@ -208,8 +210,8 @@ class EvaluateCommand
         $this->progressBar->advance();
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
-        if ($options['stable-version']) {
-            $recommended_version = $options['stable-version'];
+        if ($options['recommended-version']) {
+            $recommended_version = $options['recommended-version'];
         } else {
             $recommended_release = $this->findRecommendedRelease($project_releases, $major_version);
             $recommended_version = $recommended_release->field_release_version;
@@ -567,10 +569,10 @@ class EvaluateCommand
             ['field_issue_version' => $version]
         );
         $output_data['issues_total'] = $num_issues;
-        if ($num_issues) {
+        //if ($num_issues) {
             $issue_stats = $this->outputIssueStatistics($project, $version);
             $output_data = array_merge($output_data, $issue_stats);
-        }
+        //}
 
         $this->progressBar->setMessage('Counting total rtbc issues...');
         $this->progressBar->advance();
@@ -657,22 +659,16 @@ class EvaluateCommand
         foreach ($releases as $project_release) {
             // If field_release_version_extra is null, then it is not a dev
             // alpha, beta, or rc release.
+            $release_major_version = substr($project_release->field_release_version, 0, 3);
             if (is_null($project_release->field_release_version_extra)
-                && substr(
-                    $project_release->field_release_version,
-                    0,
-                    3
-                ) == $major_version) {
+                && $release_major_version == $major_version) {
                 return $project_release;
             }
         }
         // Otherwise, return a non-stable release.
         foreach ($releases as $project_release) {
-            if (substr(
-                    $project_release->field_release_version,
-                    0,
-                    3
-                ) == $major_version) {
+            $release_major_version = substr($project_release->field_release_version, 0, 3);
+            if ($release_major_version == $major_version) {
                 // @todo Check that minor version matches branch.
                 return $project_release;
             }
