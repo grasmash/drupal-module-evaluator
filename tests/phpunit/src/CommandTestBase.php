@@ -2,33 +2,31 @@
 
 namespace Grasmash\ComposerConverter\Tests;
 
-use Symfony\Component\Console\Tester\CommandTester;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Process\Process;
-use Webmozart\PathUtil\Path;
-
+/**
+ *
+ */
 abstract class CommandTestBase extends TestBase
 {
-    /**
-     * @var \Grasmash\ComposerConverter\Tests\Application
-     */
+  /**
+   * @var \Grasmash\ComposerConverter\Tests\Application
+   */
     protected $application;
 
-    /**
-     * @var \Grasmash\ComposerConverter\Tests\TestableComposerizeDrupalCommand $command
-     */
+  /**
+   * @var \Grasmash\ComposerConverter\Tests\TestableComposerizeDrupalCommand
+   */
     protected $command;
 
-    /**
-     * @var CommandTester
-     */
+  /**
+   * @var \Symfony\Component\Console\Tester\CommandTester
+   */
     protected $commandTester;
 
-    /**
-     * {@inheritdoc}
-     *
-     * @see https://symfony.com/doc/current/console.html#testing-commands
-     */
+  /**
+   * {@inheritdoc}
+   *
+   * @see https://symfony.com/doc/current/console.html#testing-commands
+   */
     public function setUp()
     {
         parent::setUp();

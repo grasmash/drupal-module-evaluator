@@ -3,7 +3,8 @@
 namespace Grasmash\Evaluator\DrupalOrgData;
 
 /**
- * Class Statuses
+ * Class Statuses.
+ *
  * @package Grasmash\Evaluator
  */
 final class Statuses
@@ -23,12 +24,16 @@ final class Statuses
     const CLOSED_OUTDATED = 17;
     const CLOSE_CANNOT_REPRODUCE = 18;
 
-    public static function getOpenStatuses() {
+  /**
+   *
+   */
+    public static function getOpenStatuses()
+    {
         return [
-          self::ACTIVE,
-          self::NEEDS_REVIEW,
-          self::NEEDS_WORK,
-          self::RTBC,
+        self::ACTIVE,
+        self::NEEDS_REVIEW,
+        self::NEEDS_WORK,
+        self::RTBC,
         ];
     }
 }

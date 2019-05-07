@@ -3,7 +3,8 @@
 namespace Grasmash\Evaluator\DrupalOrgData;
 
 /**
- * Class CoreCompatibilityTerms
+ * Class CoreCompatibilityTerms.
+ *
  * @package Grasmash\Evaluator
  *
  * @see https://www.drupal.org/api-d7/taxonomy_term.json?vocabulary=6

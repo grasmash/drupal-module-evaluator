@@ -3,7 +3,8 @@
 namespace Grasmash\Evaluator\DrupalOrgData;
 
 /**
- * Class Categories
+ * Class Categories.
+ *
  * @package Grasmash\Evaluator
  */
 abstract class Categories

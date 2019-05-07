@@ -55,5 +55,3 @@ $ ./bin/evaluate evaluate acquia_connector --dev-version=8.x-1.x-dev
 ```
 
 ## Scoring
-
-

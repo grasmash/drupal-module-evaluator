@@ -2,9 +2,7 @@
 
 namespace Grasmash\ComposerConverter\Tests;
 
-use Grasmash\ComposerConverter\Utility\ComposerJsonManipulator;
 use Grasmash\ComposerConverter\Utility\DrupalInspector;
-use Symfony\Component\Process\Process;
 
 /**
  * Tests the DrupalInspector class.
@@ -12,9 +10,9 @@ use Symfony\Component\Process\Process;
 class DrupalInspectorTest extends TestBase
 {
 
-    /**
-     * Tests DrupalInspector::findContribProjects().
-     */
+  /**
+   * Tests DrupalInspector::findContribProjects().
+   */
     public function testFindModules()
     {
         $this->sandbox = $this->sandboxManager->makeSandbox();
@@ -26,21 +24,21 @@ class DrupalInspectorTest extends TestBase
         $this->assertContains('3.0.0', $modules['ctools']['version']);
     }
 
-    /**
-     * @dataProvider providerGetSemanticVersion
-     */
+  /**
+   * @dataProvider providerGetSemanticVersion
+   */
     public function testGetSemanticVersion($drupal_version, $semantic_version)
     {
         $converted_version = DrupalInspector::getSemanticVersion($drupal_version);
         $this->assertEquals($semantic_version, $converted_version);
     }
 
-    /**
-     * Provides values to testArrayMergeNoDuplicates().
-     *
-     * @return array
-     *   An array of values to test.
-     */
+  /**
+   * Provides values to testArrayMergeNoDuplicates().
+   *
+   * @return array
+   *   An array of values to test.
+   */
     public function providerGetSemanticVersion()
     {
         return [
@@ -54,21 +52,21 @@ class DrupalInspectorTest extends TestBase
         ];
     }
 
-    /**
-     * @dataProvider providerGetVersionConstraint
-     */
+  /**
+   * @dataProvider providerGetVersionConstraint
+   */
     public function testGetVersionConstraint($semantic_version, $exact_versions, $expected_constraint)
     {
         $version_constraint = DrupalInspector::getVersionConstraint($semantic_version, $exact_versions);
         $this->assertEquals($expected_constraint, $version_constraint);
     }
 
-    /**
-     * Provides values to testArrayMergeNoDuplicates().
-     *
-     * @return array
-     *   An array of values to test.
-     */
+  /**
+   * Provides values to testArrayMergeNoDuplicates().
+   *
+   * @return array
+   *   An array of values to test.
+   */
     public function providerGetVersionConstraint()
     {
         return [
@@ -85,21 +83,21 @@ class DrupalInspectorTest extends TestBase
         ];
     }
 
-    /**
-     * @dataProvider providerDetermineDrupalCoreVersionFromDrupalPhp
-     */
+  /**
+   * @dataProvider providerDetermineDrupalCoreVersionFromDrupalPhp
+   */
     public function testDetermineDrupalCoreVersionFromDrupalPhp($file_contents, $expected_core_version)
     {
         $core_version = DrupalInspector::determineDrupalCoreVersionFromDrupalPhp($file_contents);
         $this->assertEquals($expected_core_version, $core_version);
     }
 
-    /**
-     * Provides values to determineDrupalCoreVersionFromDrupalPhp().
-     *
-     * @return array
-     *   An array of values to test.
-     */
+  /**
+   * Provides values to determineDrupalCoreVersionFromDrupalPhp().
+   *
+   * @return array
+   *   An array of values to test.
+   */
     public function providerDetermineDrupalCoreVersionFromDrupalPhp()
     {
         return [

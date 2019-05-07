@@ -3,7 +3,8 @@
 namespace Grasmash\Evaluator\DrupalOrgData;
 
 /**
- * Class Vocabularies
+ * Class Vocabularies.
+ *
  * @package Grasmash\Evaluator
  */
 abstract class Vocabularies

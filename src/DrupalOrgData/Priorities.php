@@ -3,7 +3,7 @@
 namespace Grasmash\Evaluator\DrupalOrgData;
 
 /**
- * Class Priorities
+ * Class Priorities.
  *
  * @package Grasmash\Evaluator
  */

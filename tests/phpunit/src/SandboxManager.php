@@ -3,56 +3,61 @@
 namespace Grasmash\ComposerConverter\Tests;
 
 use Alchemy\Zippy\Zippy;
-use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use Webmozart\PathUtil\Path;
 
+/**
+ *
+ */
 class SandboxManager
 {
     protected $tmp;
 
     protected $drupalVersion = "8.6.0";
 
-    /**
-     * @param mixed $drupalVersion
-     */
+  /**
+   * @param mixed $drupalVersion
+   */
     public function setDrupalVersion($drupalVersion)
     {
         $this->drupalVersion = $drupalVersion;
     }
 
-    /**
-     * @return mixed
-     */
+  /**
+   * @return mixed
+   */
     public function getDrupalVersion()
     {
         return $this->drupalVersion;
     }
 
-    /**
-     * @var string
-     */
+  /**
+   * @var string
+   */
     protected $composerizeDrupalPath;
 
-    /**
-     * @var Filesystem
-     */
+  /**
+   * @var \Symfony\Component\Filesystem\Filesystem
+   */
     protected $fs;
 
+  /**
+   *
+   */
     public function __construct()
     {
         $this->fs = new Filesystem();
         $this->composerizeDrupalPath = dirname(dirname(dirname(__DIR__)));
     }
 
-    /**
-     * Destroy and re-create sandbox directory for testing.
-     *
-     * Sandbox is a mirror of tests/fixtures/sandbox, located in a temp dir.
-     *
-     * @return bool|string
-     */
+  /**
+   * Destroy and re-create sandbox directory for testing.
+   *
+   * Sandbox is a mirror of tests/fixtures/sandbox, located in a temp dir.
+   *
+   * @return bool|string
+   */
     public function makeSandbox()
     {
         $this->tmp = getenv('COMPOSERIZE_DRUPAL_TMP') ?: sys_get_temp_dir();
@@ -64,7 +69,7 @@ class SandboxManager
         $this->fs->mirror($sandbox_master, $sandbox);
         $this->dowloadAndCopyDrupalCore($this->drupalVersion, $this->tmp, $sandbox);
         $this->downloadAndCopyCtools($this->tmp, $sandbox);
-        // Create fake patch for ctools.
+      // Create fake patch for ctools.
         $this->fs->touch($sandbox . "/docroot/modules/contrib/ctools/test.patch");
 
         chdir($sandbox);
@@ -82,6 +87,9 @@ class SandboxManager
         return $sandbox;
     }
 
+  /**
+   *
+   */
     protected function downloadProjectFromDrupalOrg($project_string)
     {
         $targz_filename = "$project_string.tar.gz";
@@ -106,30 +114,30 @@ class SandboxManager
         return $untarred_dirpath;
     }
 
-    /**
-     * @param $drupal_version
-     * @param $tmp
-     * @param $sandbox
-     *
-     * @return array
-     */
+  /**
+   * @param $drupal_version
+   * @param $tmp
+   * @param $sandbox
+   *
+   * @return array
+   */
     protected function dowloadAndCopyDrupalCore(
         $drupal_version,
         $tmp,
         $sandbox
     ) {
         $drupal_project_string = "drupal-$drupal_version";
-         $this->downloadProjectFromDrupalOrg($drupal_project_string);
+        $this->downloadProjectFromDrupalOrg($drupal_project_string);
         $this->fs->mirror(
             "{$this->tmp}/drupal-$drupal_version",
             $sandbox . "/docroot"
         );
     }
 
-    /**
-     * @param $tmp
-     * @param $sandbox
-     */
+  /**
+   * @param $tmp
+   * @param $sandbox
+   */
     protected function downloadAndCopyCtools($tmp, $sandbox)
     {
         $ctools_version = '8.x-3.0';

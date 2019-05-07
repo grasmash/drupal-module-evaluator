@@ -10,11 +10,11 @@ use Grasmash\ComposerConverter\Utility\ArrayManipulator;
 class ArrayManipulatorTest extends \PHPUnit_Framework_TestCase
 {
 
-    /**
-     * Tests ArrayManipulator::arrayMergeRecursiveExceptEmpty().
-     *
-     * @dataProvider providerTestArrayMergeRecursiveDistinct
-     */
+  /**
+   * Tests ArrayManipulator::arrayMergeRecursiveExceptEmpty().
+   *
+   * @dataProvider providerTestArrayMergeRecursiveDistinct
+   */
     public function testArrayMergeRecursiveDistinct(
         $array1,
         $array2,
@@ -29,57 +29,57 @@ class ArrayManipulatorTest extends \PHPUnit_Framework_TestCase
         );
     }
 
-    /**
-     * Provides values to testArrayMergeRecursiveDistinct().
-     *
-     * @return array
-     *   An array of values to test.
-     */
+  /**
+   * Provides values to testArrayMergeRecursiveDistinct().
+   *
+   * @return array
+   *   An array of values to test.
+   */
     public function providerTestArrayMergeRecursiveDistinct()
     {
 
         return [
             [
                 [
-                    'modules' => [
-                        'local' => [
-                            'enable' => ['test'],
-                        ],
-                        'ci' => [
-                            'uninstall' => ['shield'],
-                        ],
+                  'modules' => [
+                    'local' => [
+                      'enable' => ['test'],
                     ],
-                    'behat' => [
-                        'tags' => 'test',
-                        'launch-selenium' => 'true',
+                    'ci' => [
+                      'uninstall' => ['shield'],
                     ],
+                  ],
+                  'behat' => [
+                    'tags' => 'test',
+                    'launch-selenium' => 'true',
+                  ],
                 ],
                 [
-                    'modules' => [
-                        'local' => [
-                            'enable' => [],
-                        ],
-                        'ci' => [
-                            'uninstall' => ['shield'],
-                        ],
+                  'modules' => [
+                    'local' => [
+                      'enable' => [],
                     ],
-                    'behat' => [
-                        'tags' => 'nottest',
+                    'ci' => [
+                      'uninstall' => ['shield'],
                     ],
+                  ],
+                  'behat' => [
+                    'tags' => 'nottest',
+                  ],
                 ],
                 [
-                    'modules' => [
-                        'local' => [
-                            'enable' => ['test'],
-                        ],
-                        'ci' => [
-                            'uninstall' => ['shield'],
-                        ],
+                  'modules' => [
+                    'local' => [
+                      'enable' => ['test'],
                     ],
-                    'behat' => [
-                        'tags' => 'nottest',
-                        'launch-selenium' => 'true',
+                    'ci' => [
+                      'uninstall' => ['shield'],
                     ],
+                  ],
+                  'behat' => [
+                    'tags' => 'nottest',
+                    'launch-selenium' => 'true',
+                  ],
                 ],
             ],
         ];
