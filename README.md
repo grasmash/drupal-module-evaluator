@@ -51,7 +51,7 @@ $ ./bin/evaluate evaluate acquia_connector --dev-version=8.x-1.x-dev
 ```
 
 ```
-./bin/evaluate evaluate-multiple ./acquia.yml --format=csv > acquia-modules.csv
+./bin/evaluate create-report acquia.yml --format=csv > acquia-modules.csv
 ```
 
 ## Scoring

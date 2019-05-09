@@ -8,8 +8,6 @@
   branch: 7.x-1.x-dev
 - name: media_acquiadam
   branch: 8.x-1.x-dev
-- name: media_acquiadam
-  branch: 7.x-1.x-dev
 - name: acquia_lift
   branch: 8.x-3.x-dev
 - name: acquia_contenthub
@@ -22,3 +20,18 @@
   branch: 8.x-1.x-dev
 - name: acsf
   branch: 7.x-1.x-dev
+- name: memcache
+  branch: 8.x-2.x-dev
+- name: memcache
+  branch: 7.x-1.x-dev
+- name: search_api
+  branch: 8.x-1.x-dev
+- name: search_api_solr
+  branch: 8.x-1.x-dev
+- name: facets
+  branch: 8.x-1.x-dev
+- name: acquia_commercemanager
+  branch: 8.x-1.x-dev
+# Apache Solr Integration
+# Apache Solr Multisite Search
+# Acquia Lightning

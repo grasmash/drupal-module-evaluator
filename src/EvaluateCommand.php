@@ -101,17 +101,19 @@ class EvaluateCommand
   /**
    * Evaluate a multiple contributed Drupal projects.
    *
-   * @command evaluate-multiple
+   * @command create-report
    * @param string $file
    *   The file path to the yml file containing list of modules to evaluate.
+   *   See ./acquia.yml for example format.
    *
-   * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
-   * @usage ./acquia.yml --format=csv
+   * @option string $format Valid formats are: csv,json,list,null,php,print-r,
+   *   tsv,var_export,xml,yaml
+   * @usage acquia.yml --format=csv
    *
    * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
    *   Exit code of the command.
    */
-    public function evaluateMultiple(InputInterface $input, OutputInterface $output, $file, $options = [
+    public function createReport(InputInterface $input, OutputInterface $output, $file, $options = [
     'format' => 'table',
     ])
     {
@@ -140,12 +142,15 @@ class EvaluateCommand
    *
    * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
    * @option major-version Either 7 or 8.
-   * @option recommended-version The stable version to evaluate. This is used for code analysis.
+   * @option recommended-version The stable version to evaluate. E.g., 8.x-1.0. This is used for code analysis. It will default to the latest stable version on the branch.
    * @option fields Specify which fields are output.
    * @field-labels
    *   name: Name
    *   title: Title
    *   branch: Branch
+   *   score: Score
+   *   scored_points: Scored points
+   *   total_points: Total points
    *   downloads: Downloads
    *   security_advisory_coverage: Security Advisory Coverage
    *   starred: Starred
@@ -172,9 +177,6 @@ class EvaluateCommand
    *   phpcs_warnings: PHPCS warnings
    *   composer_validate: Composer validation status
    *   orca_integrated: ORCA Integrated
-   *   scored_points: Scored points
-   *   total_points: Total points
-   *   score: Score
    * @usage acquia_connector --dev-version=8.x-1.x-dev
    *
    * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
@@ -195,6 +197,7 @@ class EvaluateCommand
         $this->progressBar = new ProgressBar($output, 22);
         $this->progressBar->setFormat('custom');
         $this->progressBar->setMessage('Starting...');
+        $this->progressBar->setMessage($name . ':' . $branch, 'module');
         $this->progressBar->start();
 
         // @see https://www.drupal.org/drupalorg/docs/api
@@ -211,7 +214,6 @@ class EvaluateCommand
         }
         $major_version = $major_version_int . '.x';
 
-        $this->progressBar->setMessage($name . ':' . $branch, 'module');
         $this->progressBar->setMessage('Querying drupal.org for project metadata...');
         $this->progressBar->advance();
         $project = $this->getProject($name);
@@ -221,7 +223,7 @@ class EvaluateCommand
         'branch' => $branch,
         'downloads' => $project->field_download_count,
         'security_advisory_coverage' => $project->field_security_advisory_coverage,
-        'starred' => count($project->flag_project_star_user),
+        'starred' => (is_array($project->flag_project_star_user) || $project->flag_project_star_user instanceof \Countable) ? count($project->flag_project_star_user): 0,
         'usage' => $project->project_usage->{"$major_version"},
         ];
 
@@ -279,10 +281,13 @@ class EvaluateCommand
         $this->calculateScore($output_data);
         $output_data['scored_points'] = $this->score;
         $output_data['total_points'] = $this->total;
-        $output_data['score'] = $this->formatPercentage($this->score, $this->total);
+        $output_data['score'] = $this->formatPercentage($this->score, $this->total) . '%';
 
         $this->progressBar->setMessage('Done!');
         $this->progressBar->advance();
+
+        // Usage in per major branch. E.g., 8.2.x and 8.1.x share same usage stats.
+        // Downloads is per module. Does not distinguish between branches.
 
         return new PropertyList($output_data);
     }
@@ -449,6 +454,12 @@ class EvaluateCommand
 
   /**
    * Downloads a project tarball from Drupal.org.
+   *
+   * @param string $project_string
+   *   E.g., acquia_connector-8.x-1.0.
+   *
+   * @return string
+   *   The file path to the untarred archive.
    */
     protected function downloadProjectFromDrupalOrg($project_string)
     {
@@ -565,12 +576,12 @@ class EvaluateCommand
     }
 
     /**
-     * @param
+     * Starts the `composer validate` process.
      *
      * @return \Symfony\Component\Process\Process
+     *   The started PHP process.
      */
-    protected function startComposerValidate(): Process
-    {
+    protected function startComposerValidate(): Process {
         $process = $this->startProcess("composer validate --strict");
         return $process;
     }
@@ -579,6 +590,7 @@ class EvaluateCommand
      * Ends composer validate process and processes output.
      *
      * @param \Symfony\Component\Process\Process $process
+     *   The `composer validate` process.
      *
      * @return array
      */
@@ -613,7 +625,10 @@ class EvaluateCommand
     }
 
   /**
-   * @param $download_path
+   * Starts the `phpcs` process.
+   *
+   * @param string $download_path
+   *  The decompressed archive
    *
    * @return \Symfony\Component\Process\Process
    */
@@ -624,20 +639,21 @@ class EvaluateCommand
     }
 
   /**
-   * @param $project
-   * @param $version
+   * @param string $project
+   * @param string $branch
+   *   The module branch. E.g., 8.x-2.x-dev.
    */
-    protected function summarizeIssues($project, $version)
+    protected function summarizeIssues($project, $branch)
     {
       // Determine version to filter on.
         $this->progressBar->setMessage('Counting total open issues...');
         $this->progressBar->advance();
         $num_issues = $this->countOpenIssues(
             $project,
-            ['field_issue_version' => $version]
+            ['field_issue_version' => $branch]
         );
         $output_data['issues_total'] = $num_issues;
-        $issue_stats = $this->outputIssueStatistics($project, $version);
+        $issue_stats = $this->getIssueStatistics($project, $branch);
         $output_data = array_merge($output_data, $issue_stats);
         $this->progressBar->setMessage('Counting total rtbc issues...');
         $this->progressBar->advance();
@@ -783,34 +799,46 @@ class EvaluateCommand
     }
 
   /**
-   * @param $project
-   * @param array $priority
+   * Counts the number of open Drupal.org issues matching a query.
+   *
+   * @param string $project
+   *   The project machine name.
+   * @param array $query
+   *   An associative array to populate the request query string.
    *
    * @return int
+   *   The number of issues.
    */
     protected function countOpenIssues($project, array $query = []): int
     {
-        $num_crit_issues = 0;
+        $num_issues = 0;
         foreach (Statuses::getOpenStatuses() as $status) {
             $query['field_issue_status'] = $status;
-            $num_crit_issues += $this->countProjectIssues($project, $query);
+            $num_issues += $this->countProjectIssues($project, $query);
         }
-        return $num_crit_issues;
+        return $num_issues;
     }
 
   /**
-   * @param $project
-   * @param $version
+   * Gets statistics about issue priority, types, and categories.
+   *
+   * @param string $project
+   *   The project machine name. E.g., ctools.
+   * @param string $branch
+   *  The module version. E.g., 8.x-2.x-dev.
+   *
+   * @return array
+   *   An array of issues statistics.
    */
-    protected function outputIssueStatistics(
+    protected function getIssueStatistics(
         $project,
-        $version
+        $branch
     ) {
         $this->progressBar->setMessage('Counting open critical issues...');
         $this->progressBar->advance();
         $num_crit_issues = $this->countOpenIssues($project, [
         'field_issue_priority' => Priorities::CRITICAL,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_critical'] = $num_crit_issues;
 
@@ -818,7 +846,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_major_issues = $this->countOpenIssues($project, [
         'field_issue_priority' => Priorities::MAJOR,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_major'] = $num_major_issues;
 
@@ -826,7 +854,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_normal_issues = $this->countOpenIssues($project, [
         'field_issue_priority' => Priorities::NORMAL,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_normal'] = $num_normal_issues;
 
@@ -834,7 +862,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_minor_issues = $this->countOpenIssues($project, [
         'field_issue_priority' => Priorities::MINOR,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_minor'] = $num_minor_issues;
 
@@ -842,7 +870,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_bug_issues = $this->countOpenIssues($project, [
         'field_issue_category' => Categories::BUG_REPORT,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_bug'] = $num_bug_issues;
 
@@ -850,7 +878,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_feature_issues = $this->countOpenIssues($project, [
         'field_issue_category' => Categories::FEATURE_REQUEST,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_feature'] = $num_feature_issues;
 
@@ -858,7 +886,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_support_issues = $this->countOpenIssues($project, [
         'field_issue_category' => Categories::SUPPORT_REQUEST,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_support'] = $num_support_issues;
 
@@ -866,7 +894,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_task_issues = $this->countOpenIssues($project, [
         'field_issue_category' => Categories::TASK,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_task'] = $num_task_issues;
 
@@ -874,7 +902,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $num_plan_issues = $this->countOpenIssues($project, [
         'field_issue_category' => Categories::PLAN,
-        'field_issue_version' => $version,
+        'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_plan'] = $num_plan_issues;
 
@@ -882,7 +910,10 @@ class EvaluateCommand
     }
 
   /**
-   * @param $output_data
+   * Calculates scored points.
+   *
+   * @param array $output_data
+   *   The fully populated output array.
    */
     protected function calculateScore($output_data): void
     {
