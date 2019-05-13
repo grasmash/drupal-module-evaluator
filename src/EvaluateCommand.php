@@ -31,63 +31,63 @@ use Symfony\Component\Yaml\Yaml;
  */
 class EvaluateCommand
 {
-  /**
-   * Command input.
-   *
-   * @var \Symfony\Component\Console\Input\InputInterface
-   */
+    /**
+     * Command input.
+     *
+     * @var \Symfony\Component\Console\Input\InputInterface
+     */
     protected $input;
 
-  /**
-   * Command output.
-   *
-   * @var \Symfony\Component\Console\Output\OutputInterface
-   */
+    /**
+     * Command output.
+     *
+     * @var \Symfony\Component\Console\Output\OutputInterface
+     */
     protected $output;
 
-  /**
-   * Symfony filesystem component.
-   *
-   * @var \Symfony\Component\Filesystem\Filesystem
-   */
+    /**
+     * Symfony filesystem component.
+     *
+     * @var \Symfony\Component\Filesystem\Filesystem
+     */
     protected $fs;
 
-  /**
-   * Temporary directory.
-   *
-   * @var string
-   */
+    /**
+     * Temporary directory.
+     *
+     * @var string
+     */
     protected $tmp;
 
-  /**
-   * Symfony progress bar component.
-   *
-   * @var \Symfony\Component\Console\Helper\ProgressBar
-   */
+    /**
+     * Symfony progress bar component.
+     *
+     * @var \Symfony\Component\Console\Helper\ProgressBar
+     */
     protected $progressBar;
 
-  /**
-   * Scored points.
-   *
-   * @var int
-   */
+    /**
+     * Scored points.
+     *
+     * @var int
+     */
     protected $score;
 
-  /**
-   * Total available points.
-   *
-   * @var int
-   */
+    /**
+     * Total available points.
+     *
+     * @var int
+     */
     protected $total;
 
-  /**
-   * Shared setup for both commands.
-   *
-   * @param \Symfony\Component\Console\Input\InputInterface $input
-   *   Command input.
-   * @param \Symfony\Component\Console\Output\OutputInterface $output
-   *   Command output.
-   */
+    /**
+     * Shared setup for both commands.
+     *
+     * @param \Symfony\Component\Console\Input\InputInterface $input
+     *   Command input.
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     *   Command output.
+     */
     protected function setup(InputInterface $input, OutputInterface $output)
     {
         $this->input = $input;
@@ -98,97 +98,110 @@ class EvaluateCommand
         $this->total = 0;
     }
 
-  /**
-   * Evaluate a multiple contributed Drupal projects.
-   *
-   * @command create-report
-   * @param string $file
-   *   The file path to the yml file containing list of modules to evaluate.
-   *   See ./acquia.yml for example format.
-   *
-   * @option string $format Valid formats are: csv,json,list,null,php,print-r,
-   *   tsv,var_export,xml,yaml
-   * @usage acquia.yml --format=csv
-   *
-   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
-   *   Exit code of the command.
-   */
-    public function createReport(InputInterface $input, OutputInterface $output, $file, $options = [
-    'format' => 'table',
-    ])
-    {
+    /**
+     * Evaluate a multiple contributed Drupal projects.
+     *
+     * @command create-report
+     *
+     * @param string $file
+     *   The file path to the yml file containing list of modules to evaluate.
+     *   See ./acquia.yml for example format.
+     *
+     * @option string $format Valid formats are: csv,json,list,null,php,print-r,
+     *   tsv,var_export,xml,yaml
+     *
+     * @usage acquia.yml --format=csv
+     *
+     * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+     *   Exit code of the command.
+     */
+    public function createReport(
+        InputInterface $input,
+        OutputInterface $output,
+        $file,
+        $options = [
+            'format' => 'table',
+        ]
+    ) {
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
         $output_data = [];
         foreach ($list as $key => $args) {
             $default_options = [
-            'recommended-version' => null,
+                'recommended-version' => null,
             ];
             $options = array_merge($default_options, $options);
             $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $options);
-            $output_data[] = (array) $command_output;
+            $output_data[] = (array)$command_output;
         }
         return new RowsOfFields($output_data);
     }
 
-  /**
-   * Evaluate a contributed Drupal project.
-   *
-   * @command evaluate
-   * @param string $name
-   *   The machine name of the project to evaluate.
-   * @param string $branch
-   *   The dev version to evaluate. This is used for issue statistics.
-   *
-   * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
-   * @option major-version Either 7 or 8.
-   * @option recommended-version The stable version to evaluate. E.g., 8.x-1.0. This is used for code analysis. It will default to the latest stable version on the branch.
-   * @option fields Specify which fields are output.
-   * @field-labels
-   *   name: Name
-   *   title: Title
-   *   branch: Branch
-   *   score: Score
-   *   scored_points: Scored points
-   *   total_points: Total points
-   *   downloads: Downloads
-   *   security_advisory_coverage: Security Advisory Coverage
-   *   starred: Starred
-   *   usage: Usage
-   *   recommended-version: Recommended version
-   *   is_stable: Is stable
-   *   issues_total: Total issues
-   *   issues_priority_critical: Priority Critical Issues
-   *   issues_priority_major: Priority Major Issues
-   *   issues_priority_normal: Priority Normal Issues
-   *   issues_priority_minor: Priority Minor Issues
-   *   issues_category_bug: Priority Bug Issues
-   *   issues_category_feature: Category Feature Issues
-   *   issues_category_support: Category Support Issues
-   *   issues_category_task: Category Task Issues
-   *   issues_category_plan: Category Plan Issues
-   *   issues_status_rtbc: Status RTBC Issues
-   *   issues_status_fixed_last: Last "Closed/fixed" issue date
-   *   releases_total: Total releases
-   *   releases_last: Last release date
-   *   releases_days_since: Days since last release
-   *   deprecation_errors: Deprecation errors
-   *   phpcs_errors: PHPCS errors
-   *   phpcs_warnings: PHPCS warnings
-   *   composer_validate: Composer validation status
-   *   orca_integrated: ORCA Integrated
-   * @usage acquia_connector --dev-version=8.x-1.x-dev
-   *
-   * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
-   *   Exit code of the command.
-   *
-   * @throws \Exception
-   */
-    public function evaluate(InputInterface $input, OutputInterface $output, $name, $branch, $options = [
-    'format' => 'table',
-    'recommended-version' => null,
-    ])
-    {
+    /**
+     * Evaluate a contributed Drupal project.
+     *
+     * @command evaluate
+     *
+     * @param string $name
+     *   The machine name of the project to evaluate.
+     * @param string $branch
+     *   The dev version to evaluate. This is used for issue statistics.
+     *
+     * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
+     * @option major-version Either 7 or 8.
+     * @option recommended-version The stable version to evaluate. E.g., 8.x-1.0. This is used for code analysis. It will default to the latest stable version on the branch.
+     * @option fields Specify which fields are output.
+     * @field-labels
+     *   name: Name
+     *   title: Title
+     *   branch: Branch
+     *   score: Score
+     *   scored_points: Scored points
+     *   total_points: Total points
+     *   downloads: Downloads
+     *   security_advisory_coverage: Security Advisory Coverage
+     *   starred: Starred
+     *   usage: Usage
+     *   recommended-version: Recommended version
+     *   is_stable: Is stable
+     *   issues_total: Total issues
+     *   issues_priority_critical: Priority Critical Issues
+     *   issues_priority_major: Priority Major Issues
+     *   issues_priority_normal: Priority Normal Issues
+     *   issues_priority_minor: Priority Minor Issues
+     *   issues_category_bug: Priority Bug Issues
+     *   issues_category_feature: Category Feature Issues
+     *   issues_category_support: Category Support Issues
+     *   issues_category_task: Category Task Issues
+     *   issues_category_plan: Category Plan Issues
+     *   issues_status_rtbc: Status RTBC Issues
+     *   issues_status_fixed_last: Last "Closed/fixed" issue date
+     *   releases_total: Total releases
+     *   releases_last: Last release date
+     *   releases_days_since: Days since last release
+     *   deprecation_errors: Deprecation errors
+     *   phpcs_errors: PHPCS errors
+     *   phpcs_warnings: PHPCS warnings
+     *   composer_validate: Composer validation status
+     *   orca_integrated: ORCA Integrated
+     *
+     * @usage acquia_connector --dev-version=8.x-1.x-dev
+     *
+     * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
+     *   Exit code of the command.
+     *
+     * @throws \Exception
+     */
+    public function evaluate(
+        InputInterface $input,
+        OutputInterface $output,
+        $name,
+        $branch,
+        $options = [
+            'format' => 'table',
+            'recommended-version' => null,
+        ]
+    ) {
         $this->setup($input, $output);
         ProgressBar::setFormatDefinition('custom', 'Evaluating <comment>%module%</comment>
  %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%
@@ -218,13 +231,13 @@ class EvaluateCommand
         $this->progressBar->advance();
         $project = $this->getProject($name);
         $metadata = [
-        'name' => $name,
-        'title' => $project->title,
-        'branch' => $branch,
-        'downloads' => $project->field_download_count,
-        'security_advisory_coverage' => $project->field_security_advisory_coverage,
-        'starred' => (is_array($project->flag_project_star_user) || $project->flag_project_star_user instanceof \Countable) ? count($project->flag_project_star_user): 0,
-        'usage' => $project->project_usage->{"$major_version"},
+            'name' => $name,
+            'title' => $project->title,
+            'branch' => $branch,
+            'downloads' => $project->field_download_count,
+            'security_advisory_coverage' => $project->field_security_advisory_coverage,
+            'starred' => (is_array($project->flag_project_star_user) || $project->flag_project_star_user instanceof \Countable) ? count($project->flag_project_star_user) : 0,
+            'usage' => $project->project_usage->{"$major_version"},
         ];
 
         $this->progressBar->setMessage('Querying drupal.org for project releases...');
@@ -258,7 +271,7 @@ class EvaluateCommand
 
         $this->progressBar->setMessage('Calculating issues statistics...');
         $this->progressBar->advance();
-        $issue_stats = $this->summarizeIssues($project, $branch);
+        $issue_stats = $this->calculateIssueStatistics($project, $branch);
         $this->progressBar->setMessage('Calculating release statistics...');
         $this->progressBar->advance();
         $release_stats = $this->summarizeReleases($project_releases);
@@ -269,14 +282,8 @@ class EvaluateCommand
 
         $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
 
-        $output_data = array_merge(
-            $metadata,
-            $issue_stats,
-            $release_stats,
-            $phpstan_stats,
-            $phpcs_stats,
-            $composer_stats
-        );
+        $output_data = array_merge($metadata, $issue_stats, $release_stats, $phpstan_stats, $phpcs_stats,
+            $composer_stats);
 
         $this->calculateScore($output_data);
         $output_data['scored_points'] = $this->score;
@@ -292,16 +299,16 @@ class EvaluateCommand
         return new PropertyList($output_data);
     }
 
-  /**
-   * Increase scored points if criteria evaluates as true.
-   *
-   * @param bool $passes
-   *   Indicates whether criteria evaluates as TRUE or FALSE.
-   * @param int $scored_points
-   *   The number of points scored.
-   * @param ith $total_points
-   *   The total number of available points to score for criteria.
-   */
+    /**
+     * Increase scored points if criteria evaluates as true.
+     *
+     * @param bool $passes
+     *   Indicates whether criteria evaluates as TRUE or FALSE.
+     * @param int $scored_points
+     *   The number of points scored.
+     * @param ith $total_points
+     *   The total number of available points to score for criteria.
+     */
     protected function scoreCriteria($passes, $scored_points, $total_points)
     {
         if ($passes) {
@@ -310,23 +317,23 @@ class EvaluateCommand
         $this->total += $total_points;
     }
 
-  /**
-   * Counts project issues that match a particular query.
-   *
-   * @param string $project
-   *   The project machine name.
-   * @param array $query
-   *   An array of query parameters for the Drupal.org request.
-   *
-   * @return int
-   *   The number of issues.
-   */
+    /**
+     * Counts project issues that match a particular query.
+     *
+     * @param string $project
+     *   The project machine name.
+     * @param array $query
+     *   An array of query parameters for the Drupal.org request.
+     *
+     * @return int
+     *   The number of issues.
+     */
     protected function countProjectIssues($project, $query = [])
     {
         if ($project->field_project_has_issue_queue) {
             $default_query = [
-            'field_project' => $project->nid,
-            'type' => 'project_issue',
+                'field_project' => $project->nid,
+                'type' => 'project_issue',
             ];
             $query = array_merge($default_query, $query);
             $response_object = $this->requestNode($query);
@@ -338,9 +345,9 @@ class EvaluateCommand
 
             if ($num_pages > 1) {
                 $response_object = $this->requestNode([
-                'field_project' => $project->nid,
-                'type' => 'project_issue',
-                'page' => $num_pages,
+                    'field_project' => $project->nid,
+                    'type' => 'project_issue',
+                    'page' => $num_pages,
                 ]);
                 $list_count = count($response_object->list);
                 $num_issues = (($num_pages - 1) * 100) + $list_count;
@@ -353,26 +360,26 @@ class EvaluateCommand
         }
     }
 
-  /**
-   * Gets all of the releases for a project matching a major core version.
-   *
-   * @param string $project
-   *   Project machine name.
-   * @param $core_compatibility
-   *   Core compatibility. E.g., CoreCompatibilityTerms::DRUPAL_8X.
-   *
-   * @return array
-   *   An array of releases.
-   */
+    /**
+     * Gets all of the releases for a project matching a major core version.
+     *
+     * @param string $project
+     *   Project machine name.
+     * @param $core_compatibility
+     *   Core compatibility. E.g., CoreCompatibilityTerms::DRUPAL_8X.
+     *
+     * @return array
+     *   An array of releases.
+     */
     protected function getProjectReleases($project, $core_compatibility)
     {
         // Maybe use a different endpoint?
         // @see https://updates.drupal.org/release-history/ctools/8.x
         if ($project->field_project_has_releases) {
             $response_object = $this->requestNode([
-            'field_release_project' => $project->nid,
-            'type' => 'project_release',
-            'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
+                'field_release_project' => $project->nid,
+                'type' => 'project_release',
+                'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
             ]);
             return $response_object->list;
         } else {
@@ -380,54 +387,42 @@ class EvaluateCommand
         }
     }
 
-  /**
-   * Creates a Guzzle client with local file caching middleware.
-   *
-   * @return \GuzzleHttp\Client
-   *   The Guzzle client.
-   */
+    /**
+     * Creates a Guzzle client with local file caching middleware.
+     *
+     * @return \GuzzleHttp\Client
+     *   The Guzzle client.
+     */
     protected function createGuzzleClient()
     {
         $stack = HandlerStack::create();
-        $stack->push(
-            new CacheMiddleware(
-                new PrivateCacheStrategy(
-                    new DoctrineCacheStorage(
-                        new FilesystemCache(__DIR__ . '/../cache')
-                    )
-                )
-            ),
-            'cache'
-        );
+        $stack->push(new CacheMiddleware(new PrivateCacheStrategy(new DoctrineCacheStorage(new FilesystemCache(__DIR__ . '/../cache')))),
+            'cache');
         $client = new Client(['handler' => $stack]);
         return $client;
     }
 
-  /**
-   * Requests a node from the Drupal.org API.
-   *
-   * @param array $query
-   *   The query to add to the end of the Drupal.org API.
-   *
-   * @return object
-   *   The response object.
-   *
-   * @throws \Exception
-   *   Thrown if request is unsuccessful.
-   */
+    /**
+     * Requests a node from the Drupal.org API.
+     *
+     * @param array $query
+     *   The query to add to the end of the Drupal.org API.
+     *
+     * @return object
+     *   The response object.
+     *
+     * @throws \Exception
+     *   Thrown if request is unsuccessful.
+     */
     protected function requestNode($query)
     {
         $client = $this->createGuzzleClient();
-        $response = $client->request(
-            'GET',
-            'https://www.drupal.org/api-d7/node.json',
-            [
-            'query' => $query,
-            'on_stats' => function (TransferStats $stats) use (&$url) {
-                $url = $stats->getEffectiveUri();
-            },
-            ]
-        );
+        $response = $client->request('GET', 'https://www.drupal.org/api-d7/node.json', [
+                'query' => $query,
+                'on_stats' => function (TransferStats $stats) use (&$url) {
+                    $url = $stats->getEffectiveUri();
+                },
+            ]);
         if ($response->getStatusCode() !== 200) {
             throw new \Exception("Request to $url failed, returned {$response->getStatusCode()} with reason: {$response->getReasonPhrase()}");
         }
@@ -436,43 +431,37 @@ class EvaluateCommand
         return $response_object;
     }
 
-  /**
-   * Formats a percentage, given a numerator and denominator.
-   *
-   * @param int $numerator
-   *   The numerator.
-   * @param int $denominator
-   *   The denominator.
-   *
-   * @return string
-   *   The formatted percentage.
-   */
+    /**
+     * Formats a percentage, given a numerator and denominator.
+     *
+     * @param int $numerator
+     *   The numerator.
+     * @param int $denominator
+     *   The denominator.
+     *
+     * @return string
+     *   The formatted percentage.
+     */
     protected function formatPercentage($numerator, $denominator)
     {
         return number_format($numerator / $denominator * 100, 2);
     }
 
-  /**
-   * Downloads a project tarball from Drupal.org.
-   *
-   * @param string $project_string
-   *   E.g., acquia_connector-8.x-1.0.
-   *
-   * @return string
-   *   The file path to the untarred archive.
-   */
+    /**
+     * Downloads a project tarball from Drupal.org.
+     *
+     * @param string $project_string
+     *   E.g., acquia_connector-8.x-1.0.
+     *
+     * @return string
+     *   The file path to the untarred archive.
+     */
     protected function downloadProjectFromDrupalOrg($project_string)
     {
         $targz_filename = "$project_string.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
         $untarred_dirpath = "{$this->tmp}/$project_string";
-        file_put_contents(
-            $targz_filepath,
-            fopen(
-                "https://ftp.drupal.org/files/projects/$targz_filename",
-                'r'
-            )
-        );
+        file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
         if (!file_exists($untarred_dirpath)) {
             $this->fs->mkdir($untarred_dirpath);
             $zippy = Zippy::load();
@@ -483,14 +472,14 @@ class EvaluateCommand
         return $untarred_dirpath;
     }
 
-  /**
-   * Starts a phpstan process.
-   *
-   * @param string $download_path
-   *  The path of the directory to scan.
-   *
-   * @return \Symfony\Component\Process\Process
-   */
+    /**
+     * Starts a phpstan process.
+     *
+     * @param string $download_path
+     *  The path of the directory to scan.
+     *
+     * @return \Symfony\Component\Process\Process
+     */
     protected function startPhpStan(
         $download_path
     ): Process {
@@ -498,14 +487,14 @@ class EvaluateCommand
         return $this->startProcess($command);
     }
 
-  /**
-   * Starts a command process.
-   *
-   * @param string $command
-   *   The command to run.
-   *
-   * @return \Symfony\Component\Process\Process
-   */
+    /**
+     * Starts a command process.
+     *
+     * @param string $command
+     *   The command to run.
+     *
+     * @return \Symfony\Component\Process\Process
+     */
     protected function startProcess(
         $command
     ): Process {
@@ -520,14 +509,14 @@ class EvaluateCommand
         return $process;
     }
 
-  /**
-   * Ends phpstan process and processes output.
-   *
-   * @param Process $phpstan_process
-   * @param string $project_name
-   *
-   * @return array
-   */
+    /**
+     * Ends phpstan process and processes output.
+     *
+     * @param Process $phpstan_process
+     * @param string $project_name
+     *
+     * @return array
+     */
     protected function endPhpStan(
         Process $phpstan_process,
         $project_name
@@ -547,14 +536,14 @@ class EvaluateCommand
         return $output_data;
     }
 
-  /**
-   * Ends phpcs process and processes output.
-   *
-   * @param \Symfony\Component\Process\Process $phpcs_process
-   * @param string $project_name
-   *
-   * @return array
-   */
+    /**
+     * Ends phpcs process and processes output.
+     *
+     * @param \Symfony\Component\Process\Process $phpcs_process
+     * @param string $project_name
+     *
+     * @return array
+     */
     protected function endPhpCs(
         $phpcs_process,
         $project_name
@@ -581,7 +570,8 @@ class EvaluateCommand
      * @return \Symfony\Component\Process\Process
      *   The started PHP process.
      */
-    protected function startComposerValidate(): Process {
+    protected function startComposerValidate(): Process
+    {
         $process = $this->startProcess("composer validate --strict");
         return $process;
     }
@@ -603,7 +593,7 @@ class EvaluateCommand
         $output_data = [];
 
         switch ($exit_code) {
-          // Success.
+            // Success.
             case 0:
                 $output_data['composer_validate'] = 'passes';
                 break;
@@ -624,45 +614,48 @@ class EvaluateCommand
         return $output_data;
     }
 
-  /**
-   * Starts the `phpcs` process.
-   *
-   * @param string $download_path
-   *  The decompressed archive
-   *
-   * @return \Symfony\Component\Process\Process
-   */
+    /**
+     * Starts the `phpcs` process.
+     *
+     * @param string $download_path
+     *  The decompressed archive
+     *
+     * @return \Symfony\Component\Process\Process
+     */
     protected function startPhpCs($download_path): Process
     {
         $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json");
         return $process;
     }
 
-  /**
-   * @param string $project
-   * @param string $branch
-   *   The module branch. E.g., 8.x-2.x-dev.
-   */
-    protected function summarizeIssues($project, $branch)
+    /**
+     * Calculates issue statistics.
+     *
+     * @param string $project
+     *   The project machine name. E.g., machine name.
+     * @param string $branch
+     *   The module branch. E.g., 8.x-2.x-dev.
+     *
+     * @return array
+     *   The output data.
+     */
+    protected function calculateIssueStatistics($project, $branch)
     {
-      // Determine version to filter on.
+        // Determine version to filter on.
         $this->progressBar->setMessage('Counting total open issues...');
         $this->progressBar->advance();
-        $num_issues = $this->countOpenIssues(
-            $project,
-            ['field_issue_version' => $branch]
-        );
+        $num_issues = $this->countOpenIssues($project, ['field_issue_version' => $branch]);
         $output_data['issues_total'] = $num_issues;
         $issue_stats = $this->getIssueStatistics($project, $branch);
         $output_data = array_merge($output_data, $issue_stats);
         $this->progressBar->setMessage('Counting total rtbc issues...');
         $this->progressBar->advance();
         $query = [
-        'field_project' => $project->nid,
-        'type' => 'project_issue',
-        'field_issue_status' => Statuses::RTBC,
-        'sort' => 'changed',
-        'direction' => 'DESC',
+            'field_project' => $project->nid,
+            'type' => 'project_issue',
+            'field_issue_status' => Statuses::RTBC,
+            'sort' => 'changed',
+            'direction' => 'DESC',
         ];
         $response_object = $this->requestNode($query);
         $num_rtbc = count($response_object->list);
@@ -671,11 +664,11 @@ class EvaluateCommand
         $this->progressBar->setMessage('Finding last fixed issue...');
         $this->progressBar->advance();
         $query = [
-        'field_project' => $project->nid,
-        'type' => 'project_issue',
-        'field_issue_status' => Statuses::CLOSED_FIXED,
-        'sort' => 'changed',
-        'direction' => 'DESC',
+            'field_project' => $project->nid,
+            'type' => 'project_issue',
+            'field_issue_status' => Statuses::CLOSED_FIXED,
+            'sort' => 'changed',
+            'direction' => 'DESC',
         ];
         $response_object = $this->requestNode($query);
         if (count($response_object->list)) {
@@ -689,9 +682,15 @@ class EvaluateCommand
         return $output_data;
     }
 
-  /**
-   * @param $project_releases
-   */
+    /**
+     * Gets statistics about project releases.
+     *
+     * @param array $project_releases
+     *   An array of project releases.
+     *
+     * @return array
+     *   Array of output data.
+     */
     protected function summarizeReleases($project_releases)
     {
         $num_releases = count($project_releases);
@@ -708,12 +707,18 @@ class EvaluateCommand
         return $output_data;
     }
 
-  /**
-   * @param $project_name
-   *
-   * @return mixed
-   * @throws \Exception
-   */
+    /**
+     * Gets the project node from Drupal.org.
+     *
+     * @param string $project_name
+     *   The project machine name.
+     *
+     * @return array
+     *   The project node data.
+     *
+     * @throws \Exception
+     *   Throws an exception if the project was not found on Drupal.org.
+     */
     protected function getProject($project_name)
     {
         $response_object = $this->requestNode(['field_project_machine_name' => $project_name]);
@@ -726,55 +731,60 @@ class EvaluateCommand
         return $project;
     }
 
-  /**
-   * @param $project_releases
-   * @param $major_version
-   *
-   * @return mixed
-   */
-    protected function findRecommendedRelease($project_releases, $major_version, $branch)
-    {
-      // Stable releases are typically at the end of the array.
+    /**
+     * Finds the latest recommended release for a project.
+     *
+     * Matches a given major version and branch.
+     *
+     * @param $project_releases
+     * @param $major_version
+     * @param string $branch
+     *   The module branch. E.g., 8.x-2.x-dev.
+     *
+     * @return mixed
+     */
+    protected function findRecommendedRelease(
+        $project_releases,
+        $major_version,
+        $branch
+    ) {
+        // Stable releases are typically at the end of the array.
         $releases = array_reverse($project_releases);
         $branch_minor_version = substr($branch, 4, 1);
         foreach ($releases as $project_release) {
-          // If field_release_version_extra is null, then it is not a dev
-          // alpha, beta, or rc release.
+            // If field_release_version_extra is null, then it is not a dev
+            // alpha, beta, or rc release.
             $release_major_version = substr($project_release->field_release_version, 0, 3);
-            if (is_null($project_release->field_release_version_extra)
-            && $release_major_version == $major_version
-            && $project_release->field_release_version_major == $branch_minor_version) {
+            if (is_null($project_release->field_release_version_extra) && $release_major_version == $major_version && $project_release->field_release_version_major == $branch_minor_version) {
                 return $project_release;
             }
         }
-      // Otherwise, return a non-stable release.
+        // Otherwise, return a non-stable release.
         foreach ($releases as $project_release) {
             $release_major_version = substr($project_release->field_release_version, 0, 3);
-            if ($release_major_version == $major_version
-            && $project_release->field_release_version_major == $branch_minor_version) {
+            if ($release_major_version == $major_version && $project_release->field_release_version_major == $branch_minor_version) {
                 return $project_release;
             }
         }
     }
 
-  /**
-   * @param $project_releases
-   * @param $major_version
-   * @param $project_name
-   *
-   * @return mixed
-   * @throws \Exception
-   */
+    /**
+     * @param $project_releases
+     * @param $major_version
+     * @param $project_name
+     *
+     * @return mixed
+     * @throws \Exception
+     */
     protected function determineDevRelease(
         $project_releases,
         $major_version,
         $project_name
     ) {
-      // We're only querying dev versions. E.g., 8.x-3-x-dev.
+        // We're only querying dev versions. E.g., 8.x-3-x-dev.
         foreach ($project_releases as $project_release) {
-            if ($project_release->field_release_version_extra
-            && substr($project_release->field_release_version, 0, 3) == $major_version
-            && $project_release->field_release_version_extra == 'dev') {
+            if ($project_release->field_release_version_extra && substr($project_release->field_release_version, 0,
+                    3) == $major_version && $project_release->field_release_version_extra == 'dev') {
                 $dev_version = $project_release->field_release_version;
                 return $dev_version;
             }
@@ -784,11 +794,11 @@ class EvaluateCommand
         }
     }
 
-  /**
-   * @param $label
-   * @param $value
-   * @param $threshold
-   */
+    /**
+     * @param $label
+     * @param $value
+     * @param $threshold
+     */
     protected function printMetric($label, $value, $threshold, $suffix = '')
     {
         $message_type = 'info';
@@ -798,17 +808,17 @@ class EvaluateCommand
         $this->output->writeln("<$message_type>$label</$message_type>: $value $suffix");
     }
 
-  /**
-   * Counts the number of open Drupal.org issues matching a query.
-   *
-   * @param string $project
-   *   The project machine name.
-   * @param array $query
-   *   An associative array to populate the request query string.
-   *
-   * @return int
-   *   The number of issues.
-   */
+    /**
+     * Counts the number of open Drupal.org issues matching a query.
+     *
+     * @param string $project
+     *   The project machine name.
+     * @param array $query
+     *   An associative array to populate the request query string.
+     *
+     * @return int
+     *   The number of issues.
+     */
     protected function countOpenIssues($project, array $query = []): int
     {
         $num_issues = 0;
@@ -819,17 +829,17 @@ class EvaluateCommand
         return $num_issues;
     }
 
-  /**
-   * Gets statistics about issue priority, types, and categories.
-   *
-   * @param string $project
-   *   The project machine name. E.g., ctools.
-   * @param string $branch
-   *  The module version. E.g., 8.x-2.x-dev.
-   *
-   * @return array
-   *   An array of issues statistics.
-   */
+    /**
+     * Gets statistics about issue priority, types, and categories.
+     *
+     * @param string $project
+     *   The project machine name. E.g., ctools.
+     * @param string $branch
+     *  The module version. E.g., 8.x-2.x-dev.
+     *
+     * @return array
+     *   An array of issues statistics.
+     */
     protected function getIssueStatistics(
         $project,
         $branch
@@ -837,105 +847,93 @@ class EvaluateCommand
         $this->progressBar->setMessage('Counting open critical issues...');
         $this->progressBar->advance();
         $num_crit_issues = $this->countOpenIssues($project, [
-        'field_issue_priority' => Priorities::CRITICAL,
-        'field_issue_version' => $branch,
+            'field_issue_priority' => Priorities::CRITICAL,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_critical'] = $num_crit_issues;
 
         $this->progressBar->setMessage('Counting open major issues...');
         $this->progressBar->advance();
         $num_major_issues = $this->countOpenIssues($project, [
-        'field_issue_priority' => Priorities::MAJOR,
-        'field_issue_version' => $branch,
+            'field_issue_priority' => Priorities::MAJOR,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_major'] = $num_major_issues;
 
         $this->progressBar->setMessage('Counting open normal issues...');
         $this->progressBar->advance();
         $num_normal_issues = $this->countOpenIssues($project, [
-        'field_issue_priority' => Priorities::NORMAL,
-        'field_issue_version' => $branch,
+            'field_issue_priority' => Priorities::NORMAL,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_normal'] = $num_normal_issues;
 
         $this->progressBar->setMessage('Counting open minor issues...');
         $this->progressBar->advance();
         $num_minor_issues = $this->countOpenIssues($project, [
-        'field_issue_priority' => Priorities::MINOR,
-        'field_issue_version' => $branch,
+            'field_issue_priority' => Priorities::MINOR,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_priority_minor'] = $num_minor_issues;
 
         $this->progressBar->setMessage('Counting open bug issues...');
         $this->progressBar->advance();
         $num_bug_issues = $this->countOpenIssues($project, [
-        'field_issue_category' => Categories::BUG_REPORT,
-        'field_issue_version' => $branch,
+            'field_issue_category' => Categories::BUG_REPORT,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_bug'] = $num_bug_issues;
 
         $this->progressBar->setMessage('Counting open feature issues...');
         $this->progressBar->advance();
         $num_feature_issues = $this->countOpenIssues($project, [
-        'field_issue_category' => Categories::FEATURE_REQUEST,
-        'field_issue_version' => $branch,
+            'field_issue_category' => Categories::FEATURE_REQUEST,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_feature'] = $num_feature_issues;
 
         $this->progressBar->setMessage('Counting open support issues...');
         $this->progressBar->advance();
         $num_support_issues = $this->countOpenIssues($project, [
-        'field_issue_category' => Categories::SUPPORT_REQUEST,
-        'field_issue_version' => $branch,
+            'field_issue_category' => Categories::SUPPORT_REQUEST,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_support'] = $num_support_issues;
 
         $this->progressBar->setMessage('Counting open task issues...');
         $this->progressBar->advance();
         $num_task_issues = $this->countOpenIssues($project, [
-        'field_issue_category' => Categories::TASK,
-        'field_issue_version' => $branch,
+            'field_issue_category' => Categories::TASK,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_task'] = $num_task_issues;
 
         $this->progressBar->setMessage('Counting open plan issues...');
         $this->progressBar->advance();
         $num_plan_issues = $this->countOpenIssues($project, [
-        'field_issue_category' => Categories::PLAN,
-        'field_issue_version' => $branch,
+            'field_issue_category' => Categories::PLAN,
+            'field_issue_version' => $branch,
         ]);
         $output_data['issues_category_plan'] = $num_plan_issues;
 
         return $output_data;
     }
 
-  /**
-   * Calculates scored points.
-   *
-   * @param array $output_data
-   *   The fully populated output array.
-   */
+    /**
+     * Calculates scored points.
+     *
+     * @param array $output_data
+     *   The fully populated output array.
+     */
     protected function calculateScore($output_data): void
     {
-        $this->scoreCriteria(
-            $output_data['security_advisory_coverage'] == 'covered',
-            5,
-            5
-        );
+        $this->scoreCriteria($output_data['security_advisory_coverage'] == 'covered', 5, 5);
         $this->scoreCriteria($output_data['is_stable'] == 'yes', 5, 5);
         $this->scoreCriteria($output_data['issues_priority_critical'] == 0, 5, 5);
         $this->scoreCriteria($output_data['issues_status_rtbc'] == 0, 5, 5);
         $this->scoreCriteria($output_data['releases_days_since'] <= 90, 5, 5);
-        $this->scoreCriteria(
-            $output_data['deprecation_errors'] == 0,
-            5,
-            5
-        );
-        $this->scoreCriteria(
-            $output_data['phpcs_errors'] + $output_data['phpcs_warnings'] == 0,
-            5,
-            5
-        );
+        $this->scoreCriteria($output_data['deprecation_errors'] == 0, 5, 5);
+        $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] == 0, 5, 5);
         $this->scoreCriteria($output_data['composer_validate'] == 'passes', 5, 5);
         $this->scoreCriteria($output_data['orca_integrated'] == 'passes', 5, 5);
     }
