@@ -125,15 +125,17 @@ class EvaluateCommand
     ) {
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
+        $default_options = [
+            'recommended-version' => null,
+        ];
+        $options = array_merge($default_options, $options);
         $output_data = [];
         foreach ($list as $key => $args) {
-            $default_options = [
-                'recommended-version' => null,
-            ];
-            $options = array_merge($default_options, $options);
             $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $options);
-            $output_data[] = (array)$command_output;
+            $output_data[] = (array) $command_output;
         }
+
+
         return new RowsOfFields($output_data);
     }
 
@@ -223,7 +225,7 @@ class EvaluateCommand
         } elseif ($major_version_int == 7) {
             $core_compatibility = CoreCompatibilityTerms::DRUPAL_7X;
         } else {
-            throw new \Exception("You must specify either a major version of either 7 or 8!");
+            throw new \Exception('You must specify either a major version of either 7 or 8!');
         }
         $major_version = $major_version_int . '.x';
 
@@ -306,10 +308,10 @@ class EvaluateCommand
      *   Indicates whether criteria evaluates as TRUE or FALSE.
      * @param int $scored_points
      *   The number of points scored.
-     * @param ith $total_points
+     * @param int $total_points
      *   The total number of available points to score for criteria.
      */
-    protected function scoreCriteria($passes, $scored_points, $total_points)
+    protected function scoreCriteria($passes, $scored_points, $total_points) : void
     {
         if ($passes) {
             $this->score += $scored_points;
@@ -399,6 +401,7 @@ class EvaluateCommand
         $stack->push(new CacheMiddleware(new PrivateCacheStrategy(new DoctrineCacheStorage(new FilesystemCache(__DIR__ . '/../cache')))),
             'cache');
         $client = new Client(['handler' => $stack]);
+
         return $client;
     }
 
@@ -462,6 +465,7 @@ class EvaluateCommand
         $targz_filepath = "{$this->tmp}/$targz_filename";
         $untarred_dirpath = "{$this->tmp}/$project_string";
         file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
+        $this->fs->remove($untarred_dirpath);
         if (!file_exists($untarred_dirpath)) {
             $this->fs->mkdir($untarred_dirpath);
             $zippy = Zippy::load();
@@ -691,7 +695,7 @@ class EvaluateCommand
      * @return array
      *   Array of output data.
      */
-    protected function summarizeReleases($project_releases)
+    protected function summarizeReleases($project_releases) : array
     {
         $num_releases = count($project_releases);
         $last_release = end($project_releases);
@@ -713,13 +717,13 @@ class EvaluateCommand
      * @param string $project_name
      *   The project machine name.
      *
-     * @return array
+     * @return object
      *   The project node data.
      *
      * @throws \Exception
      *   Throws an exception if the project was not found on Drupal.org.
      */
-    protected function getProject($project_name)
+    protected function getProject($project_name) : object
     {
         $response_object = $this->requestNode(['field_project_machine_name' => $project_name]);
         $list_count = count($response_object->list);
@@ -727,8 +731,7 @@ class EvaluateCommand
             throw new \Exception("No project with machine name $project_name could be found.");
         }
 
-        $project = $response_object->list[0];
-        return $project;
+        return $response_object->list[0];
     }
 
     /**
@@ -741,7 +744,8 @@ class EvaluateCommand
      * @param string $branch
      *   The module branch. E.g., 8.x-2.x-dev.
      *
-     * @return mixed
+     * @return object
+     *   The recommended release.
      */
     protected function findRecommendedRelease(
         $project_releases,
@@ -762,7 +766,7 @@ class EvaluateCommand
         // Otherwise, return a non-stable release.
         foreach ($releases as $project_release) {
             $release_major_version = substr($project_release->field_release_version, 0, 3);
-            if ($release_major_version == $major_version && $project_release->field_release_version_major == $branch_minor_version) {
+            if ($release_major_version === $major_version && $project_release->field_release_version_major === $branch_minor_version) {
                 return $project_release;
             }
         }
@@ -784,7 +788,7 @@ class EvaluateCommand
         // We're only querying dev versions. E.g., 8.x-3-x-dev.
         foreach ($project_releases as $project_release) {
             if ($project_release->field_release_version_extra && substr($project_release->field_release_version, 0,
-                    3) == $major_version && $project_release->field_release_version_extra == 'dev') {
+                    3) === $major_version && $project_release->field_release_version_extra === 'dev') {
                 $dev_version = $project_release->field_release_version;
                 return $dev_version;
             }
@@ -799,7 +803,7 @@ class EvaluateCommand
      * @param $value
      * @param $threshold
      */
-    protected function printMetric($label, $value, $threshold, $suffix = '')
+    protected function printMetric($label, $value, $threshold, $suffix = '') : void
     {
         $message_type = 'info';
         if ($value >= $threshold) {
@@ -843,7 +847,7 @@ class EvaluateCommand
     protected function getIssueStatistics(
         $project,
         $branch
-    ) {
+    ) : array {
         $this->progressBar->setMessage('Counting open critical issues...');
         $this->progressBar->advance();
         $num_crit_issues = $this->countOpenIssues($project, [
@@ -927,14 +931,14 @@ class EvaluateCommand
      */
     protected function calculateScore($output_data): void
     {
-        $this->scoreCriteria($output_data['security_advisory_coverage'] == 'covered', 5, 5);
-        $this->scoreCriteria($output_data['is_stable'] == 'yes', 5, 5);
-        $this->scoreCriteria($output_data['issues_priority_critical'] == 0, 5, 5);
-        $this->scoreCriteria($output_data['issues_status_rtbc'] == 0, 5, 5);
+        $this->scoreCriteria($output_data['security_advisory_coverage'] === 'covered', 5, 5);
+        $this->scoreCriteria($output_data['is_stable'] === 'yes', 5, 5);
+        $this->scoreCriteria($output_data['issues_priority_critical'] === 0, 5, 5);
+        $this->scoreCriteria($output_data['issues_status_rtbc'] === 0, 5, 5);
         $this->scoreCriteria($output_data['releases_days_since'] <= 90, 5, 5);
-        $this->scoreCriteria($output_data['deprecation_errors'] == 0, 5, 5);
-        $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] == 0, 5, 5);
-        $this->scoreCriteria($output_data['composer_validate'] == 'passes', 5, 5);
-        $this->scoreCriteria($output_data['orca_integrated'] == 'passes', 5, 5);
+        $this->scoreCriteria($output_data['deprecation_errors'] === 0, 5, 5);
+        $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] === 0, 5, 5);
+        $this->scoreCriteria($output_data['composer_validate'] === 'passes', 5, 5);
+        $this->scoreCriteria($output_data['orca_integrated'] === 'passes', 5, 5);
     }
 }
