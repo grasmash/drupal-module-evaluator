@@ -81,6 +81,11 @@ class EvaluateCommand
     protected $total;
 
     /**
+     * @var bool
+     */
+    protected $drupalCoreDownloaded = false;
+
+    /**
      * Shared setup for both commands.
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input
@@ -258,6 +263,14 @@ class EvaluateCommand
         $metadata['recommended-version'] = $recommended_version;
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
+        // Download Drupal core.
+        if (!$this->drupalCoreDownloaded) {
+            $this->progressBar->setMessage('Downloading Drupal core via Composer...');
+            $this->progressBar->advance();
+            $core_download_process = $this->downloadDrupalCore($major_version_int);
+            $core_download_process->wait();
+        }
+
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
@@ -267,7 +280,11 @@ class EvaluateCommand
         // Code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
         $this->progressBar->advance();
-        $phpstan_process = $this->startPhpStan($download_path);
+
+        if ($major_version_int == 8) {
+            $this->downloadDrupalCheck();
+            $drupal_check_process = $this->startDrupalCheck($download_path);
+        }
         $phpcs_process = $this->startPhpCs($download_path);
         $composer_validate_process = $this->startComposerValidate();
 
@@ -278,13 +295,18 @@ class EvaluateCommand
         $this->progressBar->advance();
         $release_stats = $this->summarizeReleases($project_releases);
 
-        $phpstan_stats = $this->endPhpStan($phpstan_process, $name);
+        if ($major_version_int == 8) {
+            $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
+        }
+        else {
+            $drupal_check_stats['deprecation_errors'] = 0;
+        }
         $phpcs_stats = $this->endPhpCs($phpcs_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
         $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
 
-        $output_data = array_merge($metadata, $issue_stats, $release_stats, $phpstan_stats, $phpcs_stats,
+        $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_stats,
             $composer_stats);
 
         $this->calculateScore($output_data);
@@ -451,6 +473,25 @@ class EvaluateCommand
     }
 
     /**
+     * Downloads Drupal core using drupal-composer/drupal-project via Composer.
+     *
+     * @param int $major_version
+     *   The major version of Drupal core. E.g., 8.
+     *
+     * @return \Symfony\Component\Process\Process
+     */
+    protected function downloadDrupalCore($major_version) {
+        $this->drupalCoreDownloaded = true;
+        $dirname = 'drupal' . $major_version;
+        $download_path = $this->tmp . '/' . $dirname;
+        $this->fs->remove($download_path);
+        $this->fs->mkdir($download_path);
+        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev $dirname --no-interaction --no-ansi --stability=dev --working-dir={$this->tmp}");
+
+        return $process;
+    }
+
+    /**
      * Downloads a project tarball from Drupal.org.
      *
      * @param string $project_string
@@ -463,7 +504,8 @@ class EvaluateCommand
     {
         $targz_filename = "$project_string.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
-        $untarred_dirpath = "{$this->tmp}/$project_string";
+        // @todo Make major version dynamic!
+        $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib/$project_string";
         file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
         $this->fs->remove($untarred_dirpath);
         if (!file_exists($untarred_dirpath)) {
@@ -484,11 +526,11 @@ class EvaluateCommand
      *
      * @return \Symfony\Component\Process\Process
      */
-    protected function startPhpStan(
+    protected function startDrupalCheck(
         $download_path
     ): Process {
-        $command = "./vendor/bin/phpstan analyse '$download_path' --error-format=json --no-progress";
-        return $this->startProcess($command);
+        $command = "{$this->tmp}/drupal-check '$download_path' --format=json --deprecations --no-interaction --no-ansi";
+        return $this->startProcess($command, $download_path);
     }
 
     /**
@@ -500,12 +542,16 @@ class EvaluateCommand
      * @return \Symfony\Component\Process\Process
      */
     protected function startProcess(
-        $command
+        $command,
+        $dir = null
     ): Process {
-        $root_dir = dirname(__DIR__);
-        $process = new Process($command, $root_dir, null, null, 300);
+        if ($dir === null) {
+            $dir = dirname(__DIR__);
+        }
+        $process = new Process($command, $dir, null, null, 300);
         $process->start();
         if ($this->output->isVerbose()) {
+            $this->output->writeln("Executing <comment>$command</comment> in <info>$dir</info>");
             foreach ($process as $type => $data) {
                 $this->output->writeln($data);
             }
@@ -521,7 +567,7 @@ class EvaluateCommand
      *
      * @return array
      */
-    protected function endPhpStan(
+    protected function endDrupalCheck(
         Process $phpstan_process,
         $project_name
     ) {
@@ -940,5 +986,21 @@ class EvaluateCommand
         $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] === 0, 5, 5);
         $this->scoreCriteria($output_data['composer_validate'] === 'passes', 5, 5);
         $this->scoreCriteria($output_data['orca_integrated'] === 'passes', 5, 5);
+    }
+
+    /**
+     * Downloads drupal-check.
+     *
+     * This can't simply be used as a project dependency due to the issue referenced below.
+     *
+     * @see https://github.com/mglaman/drupal-check/issues/68
+     */
+    protected function downloadDrupalCheck(): void
+    {
+// Download PHPStan.
+        $destination = $this->tmp . '/drupal-check';
+        file_put_contents($destination,
+            fopen("https://github.com/mglaman/drupal-check/releases/latest/download/drupal-check.phar", 'r'));
+        $this->fs->chmod($destination, 0777);
     }
 }

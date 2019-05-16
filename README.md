@@ -13,7 +13,7 @@ composer install
 
 Example usage:
 ```
-$ ./bin/evaluate evaluate acquia_connector --dev-version=8.x-1.x-dev
+$ ./bin/evaluate evaluate acquia_connector 8.x-1.x-dev
 
   -------------------------------- ---------------------------------
   Name                             acquia_connector
