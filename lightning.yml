@@ -1,3 +1,7 @@
+# Generate a list of Lightning contrib modules:
+# composer create-project acquia/lightning-project MY_PROJECT
+# cd MY_PROJECT
+# composer show | grep drupal/ | tr -s ' ' | cut -f1,2 -d' ' | awk '{print substr($0,8,length($0))}'
 - name: acquia_connector
   branch: 8.x-1.x-dev
 - name: blazy
