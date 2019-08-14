@@ -158,6 +158,7 @@ class EvaluateCommand
      * @option major-version Either 7 or 8.
      * @option recommended-version The stable version to evaluate. E.g., 8.x-1.0. This is used for code analysis. It will default to the latest stable version on the branch.
      * @option fields Specify which fields are output.
+     * @option skip-core-download Do not re-download core. Only use this if you're repeatedly running the tool.
      * @field-labels
      *   name: Name
      *   title: Title
@@ -207,6 +208,7 @@ class EvaluateCommand
         $options = [
             'format' => 'table',
             'recommended-version' => null,
+            'skip-core-download' => null,
         ]
     ) {
         $this->setup($input, $output);
@@ -264,7 +266,7 @@ class EvaluateCommand
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
         // Download Drupal core.
-        if (!$this->drupalCoreDownloaded) {
+        if (!$this->drupalCoreDownloaded && !$options['skip-core-download']) {
             $this->progressBar->setMessage('Downloading Drupal core via Composer...');
             $this->progressBar->advance();
             $core_download_process = $this->downloadDrupalCore($major_version_int);
@@ -277,17 +279,17 @@ class EvaluateCommand
         $project_string = $name . "-" . $recommended_version;
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
-        // Code analysis.
+        // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
         $this->progressBar->advance();
 
         if ($major_version_int == 8) {
-            $this->downloadDrupalCheck();
             $drupal_check_process = $this->startDrupalCheck($download_path);
         }
         $phpcs_process = $this->startPhpCs($download_path);
         $composer_validate_process = $this->startComposerValidate();
 
+        // Get issue statistics.
         $this->progressBar->setMessage('Calculating issues statistics...');
         $this->progressBar->advance();
         $issue_stats = $this->calculateIssueStatistics($project, $branch);
@@ -295,6 +297,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $release_stats = $this->summarizeReleases($project_releases);
 
+        // End code analysis processes.
         if ($major_version_int == 8) {
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
         }
@@ -306,6 +309,7 @@ class EvaluateCommand
 
         $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
 
+        // Prepare output.
         $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_stats,
             $composer_stats);
 
@@ -529,8 +533,8 @@ class EvaluateCommand
     protected function startDrupalCheck(
         $download_path
     ): Process {
-        $command = "{$this->tmp}/drupal-check '$download_path' --format=json --deprecations --no-interaction --no-ansi";
-        return $this->startProcess($command, $download_path);
+        $command = "./vendor/bin/drupal-check --format=json --deprecations --no-interaction --no-ansi '$download_path'";
+        return $this->startProcess($command);
     }
 
     /**
@@ -548,7 +552,7 @@ class EvaluateCommand
         if ($dir === null) {
             $dir = dirname(__DIR__);
         }
-        $process = new Process($command, $dir, null, null, 300);
+        $process = new Process($command, $dir, null, null, 600);
         $process->start();
         if ($this->output->isVerbose()) {
             $this->output->writeln("Executing <comment>$command</comment> in <info>$dir</info>");
@@ -986,21 +990,5 @@ class EvaluateCommand
         $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] === 0, 5, 5);
         $this->scoreCriteria($output_data['composer_validate'] === 'passes', 5, 5);
         $this->scoreCriteria($output_data['orca_integrated'] === 'passes', 5, 5);
-    }
-
-    /**
-     * Downloads drupal-check.
-     *
-     * This can't simply be used as a project dependency due to the issue referenced below.
-     *
-     * @see https://github.com/mglaman/drupal-check/issues/68
-     */
-    protected function downloadDrupalCheck(): void
-    {
-// Download PHPStan.
-        $destination = $this->tmp . '/drupal-check';
-        file_put_contents($destination,
-            fopen("https://github.com/mglaman/drupal-check/releases/latest/download/drupal-check.phar", 'r'));
-        $this->fs->chmod($destination, 0777);
     }
 }
