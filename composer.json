@@ -19,6 +19,7 @@
         "symfony/process": "^3.4"
     },
     "require-dev": {
+        "phpcompatibility/php-compatibility": "^9.2",
         "phpunit/phpunit": "^5.7",
         "satooshi/php-coveralls": "^2.0"
     },

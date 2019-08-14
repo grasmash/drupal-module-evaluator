@@ -188,8 +188,10 @@ class EvaluateCommand
      *   releases_last: Last release date
      *   releases_days_since: Days since last release
      *   deprecation_errors: Deprecation errors
-     *   phpcs_errors: PHPCS errors
-     *   phpcs_warnings: PHPCS warnings
+     *   phpcs_drupal_errors: PHPCS Drupal errors
+     *   phpcs_drupal_warnings: PHPCS Drupal warnings
+     *   phpcs_compat_errors: PHPCS compat errors
+     *   phpcs_compat_warnings: PHPCS compat warnings
      *   composer_validate: Composer validation status
      *   orca_integrated: ORCA Integrated
      *
@@ -208,6 +210,7 @@ class EvaluateCommand
         $options = [
             'format' => 'table',
             'recommended-version' => null,
+            'major-version'
             'skip-core-download' => null,
         ]
     ) {
@@ -286,7 +289,8 @@ class EvaluateCommand
         if ($major_version_int == 8) {
             $drupal_check_process = $this->startDrupalCheck($download_path);
         }
-        $phpcs_process = $this->startPhpCs($download_path);
+        $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
+        $phpcs_php_compat_process = $this->startPhpCsPhpCompat($download_path);
         $composer_validate_process = $this->startComposerValidate();
 
         // Get issue statistics.
@@ -304,14 +308,14 @@ class EvaluateCommand
         else {
             $drupal_check_stats['deprecation_errors'] = 0;
         }
-        $phpcs_stats = $this->endPhpCs($phpcs_process, $name);
+        $phpcs_drupal_stats = $this->endPhpCsDrupal($phpcs_drupal_process, $name);
+        $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
         $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
 
         // Prepare output.
-        $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_stats,
-            $composer_stats);
+        $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
 
         $this->calculateScore($output_data);
         $output_data['scored_points'] = $this->score;
@@ -598,7 +602,7 @@ class EvaluateCommand
      *
      * @return array
      */
-    protected function endPhpCs(
+    protected function endPhpCsDrupal(
         $phpcs_process,
         $project_name
     ) {
@@ -608,8 +612,36 @@ class EvaluateCommand
         $output_data = [];
         if ($phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
-            $output_data['phpcs_errors'] = $phpcs_output->totals->errors;
-            $output_data['phpcs_warnings'] = $phpcs_output->totals->warnings;
+            $output_data['phpcs_drupal_errors'] = $phpcs_output->totals->errors;
+            $output_data['phpcs_drupal_warnings'] = $phpcs_output->totals->warnings;
+        } else {
+            $this->output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
+            $this->output->write($phpcs_process->getErrorOutput());
+        }
+
+        return $output_data;
+    }
+
+    /**
+     * Ends phpcs process and processes output.
+     *
+     * @param \Symfony\Component\Process\Process $phpcs_process
+     * @param string $project_name
+     *
+     * @return array
+     */
+    protected function endPhpCsPhpCompat(
+        $phpcs_process,
+        $project_name
+    ) {
+        $this->progressBar->setMessage('Waiting for phpcs to finish...');
+        $this->progressBar->advance();
+        $phpcs_process->wait();
+        $output_data = [];
+        if ($phpcs_process->getOutput()) {
+            $phpcs_output = json_decode($phpcs_process->getOutput());
+            $output_data['phpcs_compat_errors'] = $phpcs_output->totals->errors;
+            $output_data['phpcs_compat_warnings'] = $phpcs_output->totals->warnings;
         } else {
             $this->output->writeln("  <error>Failed to execute PHPCS against $project_name</error>");
             $this->output->write($phpcs_process->getErrorOutput());
@@ -676,9 +708,23 @@ class EvaluateCommand
      *
      * @return \Symfony\Component\Process\Process
      */
-    protected function startPhpCs($download_path): Process
+    protected function startPhpCsDrupal($download_path): Process
     {
         $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json");
+        return $process;
+    }
+
+    /**
+     * Starts the `phpcs` process.
+     *
+     * @param string $download_path
+     *  The decompressed archive
+     *
+     * @return \Symfony\Component\Process\Process
+     */
+    protected function startPhpCsPhpCompat($download_path): Process
+    {
+        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json");
         return $process;
     }
 
@@ -987,7 +1033,7 @@ class EvaluateCommand
         $this->scoreCriteria($output_data['issues_status_rtbc'] === 0, 5, 5);
         $this->scoreCriteria($output_data['releases_days_since'] <= 90, 5, 5);
         $this->scoreCriteria($output_data['deprecation_errors'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['phpcs_errors'] + $output_data['phpcs_warnings'] === 0, 5, 5);
+        $this->scoreCriteria($output_data['phpcs_drupal_errors'] + $output_data['phpcs_drupal_warnings'] === 0, 5, 5);
         $this->scoreCriteria($output_data['composer_validate'] === 'passes', 5, 5);
         $this->scoreCriteria($output_data['orca_integrated'] === 'passes', 5, 5);
     }
