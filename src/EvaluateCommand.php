@@ -268,7 +268,7 @@ class EvaluateCommand
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
         // Download Drupal core.
-        if (!$this->drupalCoreDownloaded && !$options['skip-core-download']) {
+        if (!$this->drupalCoreDownloaded && $options['skip-core-download'] !== null) {
             $this->progressBar->setMessage('Downloading Drupal core via Composer...');
             $this->progressBar->advance();
             $core_download_process = $this->downloadDrupalCore($major_version_int);
