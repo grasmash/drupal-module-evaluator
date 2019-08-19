@@ -9,10 +9,10 @@ branches:
 matrix:
   fast_finish: true
   include:
-    - php: 7.3
-  env:
-    - REPORT=acquia.yml
-    - REPORT=lightning
+  - php: 7.3
+    env: REPORT=acquia.yml
+  - php: 7.3
+    env: REPORT=lightning.yml
 
 cache:
   apt: true
