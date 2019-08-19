@@ -10,6 +10,9 @@ matrix:
   fast_finish: true
   include:
     - php: 7.3
+  env:
+    - REPORT=acquia.yml
+    - REPORT=lightning
 
 cache:
   apt: true
@@ -17,11 +20,13 @@ cache:
   - "$HOME/.composer/cache"
   - "vendor"
 
+
 install:
   - composer install
 
 script:
   - composer test
+  - ./bin/evaluate create-report $REPORT
 
 after_success:
   - travis_retry php vendor/bin/php-coveralls -v
