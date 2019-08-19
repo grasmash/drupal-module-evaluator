@@ -210,7 +210,6 @@ class EvaluateCommand
         $options = [
             'format' => 'table',
             'recommended-version' => null,
-            'major-version'
             'skip-core-download' => null,
         ]
     ) {
