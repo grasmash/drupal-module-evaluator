@@ -19,6 +19,7 @@ use Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage;
 use Kevinrob\GuzzleCache\Strategy\PrivateCacheStrategy;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -211,8 +212,8 @@ class EvaluateCommand
         $branch,
         $options = [
             'format' => 'table',
-            'recommended-version' => null,
-            'skip-core-download' => null,
+            'recommended-version' => InputOption::VALUE_REQUIRED,
+            'skip-core-download' => false,
             'fields' => '',
         ]
     ) {
