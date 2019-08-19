@@ -116,6 +116,7 @@ class EvaluateCommand
      *   tsv,var_export,xml,yaml
      *
      * @usage acquia.yml --format=csv
+     * @usage acquia.yml --fields=name,title,score,deprecation_errors
      *
      * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
      *   Exit code of the command.
@@ -126,6 +127,7 @@ class EvaluateCommand
         $file,
         $options = [
             'format' => 'table',
+            'fields' => '',
         ]
     ) {
         $this->setup($input, $output);
@@ -211,6 +213,7 @@ class EvaluateCommand
             'format' => 'table',
             'recommended-version' => null,
             'skip-core-download' => null,
+            'fields' => '',
         ]
     ) {
         $this->setup($input, $output);
