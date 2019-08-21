@@ -20,6 +20,9 @@ cache:
   - "$HOME/.composer/cache"
   - "vendor"
 
+before_script:
+  # Additional PHP config
+  - phpenv config-add travis.php.ini
 
 install:
   - composer install
