@@ -26,7 +26,7 @@ install:
 
 script:
   - composer test
-  - ./bin/evaluate create-report $REPORT
+  - ./bin/evaluate create-report $REPORT --format=yaml
 
 after_success:
   - travis_retry php vendor/bin/php-coveralls -v
