@@ -307,8 +307,7 @@ class EvaluateCommand
         // End code analysis processes.
         if ($major_version_int == 8) {
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
-        }
-        else {
+        } else {
             $drupal_check_stats['deprecation_errors'] = 0;
         }
         $phpcs_drupal_stats = $this->endPhpCsDrupal($phpcs_drupal_process, $name);
@@ -431,8 +430,10 @@ class EvaluateCommand
     protected function createGuzzleClient()
     {
         $stack = HandlerStack::create();
-        $stack->push(new CacheMiddleware(new PrivateCacheStrategy(new DoctrineCacheStorage(new FilesystemCache(__DIR__ . '/../cache')))),
-            'cache');
+        $stack->push(
+            new CacheMiddleware(new PrivateCacheStrategy(new DoctrineCacheStorage(new FilesystemCache(__DIR__ . '/../cache')))),
+            'cache'
+        );
         $client = new Client(['handler' => $stack]);
 
         return $client;
@@ -491,7 +492,8 @@ class EvaluateCommand
      *
      * @return \Symfony\Component\Process\Process
      */
-    protected function downloadDrupalCore($major_version) {
+    protected function downloadDrupalCore($major_version)
+    {
         $this->drupalCoreDownloaded = true;
         $dirname = 'drupal' . $major_version;
         $download_path = $this->tmp . '/' . $dirname;
@@ -887,8 +889,11 @@ class EvaluateCommand
     ) {
         // We're only querying dev versions. E.g., 8.x-3-x-dev.
         foreach ($project_releases as $project_release) {
-            if ($project_release->field_release_version_extra && substr($project_release->field_release_version, 0,
-                    3) === $major_version && $project_release->field_release_version_extra === 'dev') {
+            if ($project_release->field_release_version_extra && substr(
+                $project_release->field_release_version,
+                0,
+                3
+            ) === $major_version && $project_release->field_release_version_extra === 'dev') {
                 $dev_version = $project_release->field_release_version;
                 return $dev_version;
             }
