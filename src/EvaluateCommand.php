@@ -596,10 +596,12 @@ class EvaluateCommand
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
             } else {
                 $this->output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
+                $output_data['deprecation_errors'] = 0;
             }
         } else {
             $this->output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
             $this->output->write($phpstan_process->getErrorOutput());
+            $output_data['deprecation_errors'] = 0;
         }
 
         return $output_data;
