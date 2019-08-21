@@ -594,8 +594,7 @@ class EvaluateCommand
             $phpstan_output = json_decode($phpstan_process->getOutput());
             if (property_exists($phpstan_output, 'totals')) {
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
-            }
-            else {
+            } else {
                 $this->output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
             }
         } else {
