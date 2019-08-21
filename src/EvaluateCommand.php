@@ -590,9 +590,14 @@ class EvaluateCommand
         $this->progressBar->advance();
         $phpstan_process->wait();
         $output_data = [];
-        if ($phpstan_process->getOutput()) {
+        if ($phpstan_process->isSuccessful() && $phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
-            $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
+            if (property_exists($phpstan_output, 'totals')) {
+                $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
+            }
+            else {
+                $this->output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
+            }
         } else {
             $this->output->writeln("  <error>Failed to execute PHPStan against $project_name</error>");
             $this->output->write($phpstan_process->getErrorOutput());
