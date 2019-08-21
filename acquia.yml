@@ -32,6 +32,8 @@
   branch: 8.x-1.x-dev
 - name: acquia_commercemanager
   branch: 8.x-1.x-dev
+- name: lightning_core
+  branch: 8.x-4.x-dev
 # Apache Solr Integration
 # Apache Solr Multisite Search
 # Acquia Lightning

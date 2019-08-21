@@ -40,8 +40,8 @@
     },
     "minimum-stability": "stable",
     "scripts": {
-        "cs": "phpcs -n --standard=PSR2 src tests --exclude=Generic.Files.LineLength",
-        "cbf": "phpcbf -n --standard=PSR2 src tests --exclude=Generic.Files.LineLength",
+        "cs": "phpcs -n --standard=PSR2 src --exclude=Generic.Files.LineLength",
+        "cbf": "phpcbf -n --standard=PSR2 src --exclude=Generic.Files.LineLength",
         "unit": "phpunit",
         "lint": [
             "find src -name '*.php' -print0 | xargs -0 -n1 php -l",

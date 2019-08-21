@@ -198,7 +198,7 @@ class EvaluateCommand
      *   composer_validate: Composer validation status
      *   orca_integrated: ORCA Integrated
      *
-     * @usage acquia_connector --dev-version=8.x-1.x-dev
+     * @usage acquia_connector 8.x-1.x-dev
      *
      * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
      *   Exit code of the command.
@@ -497,6 +497,7 @@ class EvaluateCommand
         $download_path = $this->tmp . '/' . $dirname;
         $this->fs->remove($download_path);
         $this->fs->mkdir($download_path);
+        // @todo Cache the shit out of this!
         $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev $dirname --no-interaction --no-ansi --stability=dev --working-dir={$this->tmp}");
 
         return $process;
@@ -559,7 +560,7 @@ class EvaluateCommand
         if ($dir === null) {
             $dir = dirname(__DIR__);
         }
-        $process = new Process($command, $dir, null, null, 600);
+        $process = new Process($command, $dir, null, null, 1200);
         $process->start();
         if ($this->output->isVerbose()) {
             $this->output->writeln("Executing <comment>$command</comment> in <info>$dir</info>");
