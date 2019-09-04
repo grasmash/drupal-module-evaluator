@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+DOMO_CLIENT_ID=5cfe147e-ca58-4216-9094-96b00bffbd43
+DOMO_SCOPE=data
+DOMO_DATASET_ID=a93cb9f1-9ae3-4989-8515-0f3682f3be6a
+# DOMO_SECRET is set via Travis CI encrypted variable.
+
 # Strip header cells from CSV for Domo.
 awk 'FNR>1{print}' report.csv > report-no-headers.csv
 # Get access token.
