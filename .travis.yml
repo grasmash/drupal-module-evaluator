@@ -30,6 +30,10 @@ cache:
 install:
   - composer install
 
+before_script:
+  # Additional PHP config
+  - phpenv config-add travis.php.ini
+
 script:
   - composer test
   # Generate CSV.
