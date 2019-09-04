@@ -174,7 +174,7 @@ class EvaluateCommand
      *   security_advisory_coverage: Security Advisory Coverage
      *   starred: Starred
      *   usage: Usage
-     *   recommended-version: Recommended version
+     *   recommended_version: Recommended version
      *   is_stable: Is stable
      *   issues_total: Total issues
      *   issues_priority_critical: Priority Critical Issues
@@ -269,7 +269,7 @@ class EvaluateCommand
                 throw new \Exception("Unable to determine recommended release for $name for Drupal major version $major_version.");
             }
         }
-        $metadata['recommended-version'] = $recommended_version;
+        $metadata['recommended_version'] = $recommended_version;
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
         // Download Drupal core.

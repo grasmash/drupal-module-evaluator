@@ -4,3 +4,4 @@ build
 cache
 *.csv
 .DS_STORE
+*.csv

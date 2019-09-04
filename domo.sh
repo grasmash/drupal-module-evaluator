@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# Strip header cells from CSV for Domo.
+awk 'FNR>1{print}' report.csv > report-no-headers.csv
+# Get access token.
+DOMO_ACCESS_TOKEN=$(curl -u ${DOMO_CLIENT_ID}:${DOMO_CLIENT_SECRET} "https://api.domo.com/oauth/token?grant_type=client_credentials&scope=${DOMO_SCOPE}" | jq ".access_token" -r)
+# Send to domo.
+curl -v -H "Authorization:bearer ${DOMO_ACCESS_TOKEN}" -X PUT -H "Content-Type: text/csv" -H "Accept: application/json" "https://api.domo.com/v1/datasets/${DOMO_DATASET_ID}/data" -d @report-no-headers.csv

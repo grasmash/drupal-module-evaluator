@@ -1,0 +1,146 @@
+{
+  "name" : "Module Evaluation Report",
+  "description" : "Output of Drupal module evaluator.",
+  "rows" : 0,
+  "schema" : {
+    "columns" : [
+      {
+        "type": "STRING",
+        "name": "Name"
+      },
+      {
+        "type": "STRING",
+        "name": "Title"
+      },
+      {
+        "type": "STRING",
+        "name": "Branch"
+      },
+      {
+        "type": "LONG",
+        "name": "Score"
+      },
+      {
+        "type": "LONG",
+        "name": "Scored points"
+      },
+      {
+        "type": "LONG",
+        "name": "Total points"
+      },
+      {
+        "type": "LONG",
+        "name": "Downloads"
+      },
+      {
+        "type": "STRING",
+        "name": "Security Advisory Coverage"
+      },
+      {
+        "type": "LONG",
+        "name": "Starred"
+      },
+      {
+        "type": "LONG",
+        "name": "Usage"
+      },
+      {
+        "type": "STRING",
+        "name": "Recommended version"
+      },
+      {
+        "type": "STRING",
+        "name": "Is stable"
+      },
+      {
+        "type": "LONG",
+        "name": "Total issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Priority Critical Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Priority Major Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Priority Normal Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Priority Minor Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Priority Bug Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Category Feature Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Category Support Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Category Task Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Category Plan Issues"
+      },
+      {
+        "type": "LONG",
+        "name": "Status RTBC Issues"
+      },
+      {
+        "type": "DATETIME",
+        "name": "Last \"Closed/fixed\" issue date"
+      },
+      {
+        "type": "LONG",
+        "name": "Total releases"
+      },
+      {
+        "type": "DATETIME",
+        "name": "Last release date"
+      },
+      {
+        "type": "LONG",
+        "name": "Days since last release"
+      },
+      {
+        "type": "LONG",
+        "name": "Deprecation errors"
+      },
+      {
+        "type": "LONG",
+        "name": "PHPCS Drupal errors"
+      },
+      {
+        "type": "LONG",
+        "name": "PHPCS Drupal warnings"
+      },
+      {
+        "type": "LONG",
+        "name": "PHPCS compat errors"
+      },
+      {
+        "type": "LONG",
+        "name": "PHPCS compat warnings"
+      },
+      {
+        "type": "STRING",
+        "name": "Composer validation status"
+      },
+      {
+        "type": "STRING",
+        "name": "ORCA Integrated"
+      }
+    ]
+  }
+}
+
