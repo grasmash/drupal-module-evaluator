@@ -6,13 +6,18 @@ branches:
     - master
     - /^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*$/
 
+php:
+ - 7.3
+
 matrix:
   fast_finish: true
-  include:
-  - php: 7.3
-    env: REPORT=acquia.yml
-  - php: 7.3
-    env: REPORT=lightning.yml
+
+env:
+  global:
+    - secure: iDQYv2cA5IYXZLUF4blqu+Cctcfs759Z10oraSRQdeJaJ6lmn1EUoUfaHm7qo0V4L2F8gERY/q03Jg/urchBiQWigGkRbWAzgjIwpflWwNZiZKr0OcvbXBhvYGlWP4vdtH7EYTKdMm4TM16B+JKxPdeHw8+4z04d19J6SvDS7NzZgK5gT+yBgpxi54m41H9QxXHpIYJHHEXOyCQXT6qgYXri4rBjl/0b8ROnyljtKXy4UaAgZg8X4usSSuYj/5aK/47MDyvMLIB0jCwflbSCximJliaqJlZ50eZn1YqANTHVs7/eP4SrQElxK+jF5cjlT2CQw5k+w+FvVmU0JE6nKoarD1rccS0AZ9t615NDLReJcPo127TTm5qJufpQ5CyFMLSBoNf7AwJzAMl1+FfJlm1EXSQe2g2g+iBtKrJ9YiJ3nuNpuNXZ7mkkwStYOHboi9ZrHrQd4D9z5QA1Xsl7SeLHdmngKb3TSp2F1QFGVD8PzAYJx1fDEaFo7ALGYet5JteoYQ9nSskHm2zo/m6iQ7bfrQD1v7lh/oEaeq/EadSHoLN0/p6YG+Ydfp3ISrJv8PHKXHRqmDUT45kDBLDnxn3J0JvXY8sWClu7mlp8kO4PAE27QlMa/+GTirWr0CdXJwpjJIoKD7Mh3OpTrnAPUD6VefNGSo7YmpozJ8sJCn4=
+  matrix:
+    - REPORT=lightning.yml
+    - REPORT=acquia.yml
 
 cache:
   apt: true
@@ -20,13 +25,25 @@ cache:
   - "$HOME/.composer/cache"
   - "vendor"
 
+install:
+  - composer install
+
 before_script:
   # Additional PHP config
   - phpenv config-add travis.php.ini
 
-install:
-  - composer install
-
 script:
   - composer test
-  - ./bin/evaluate create-report $REPORT --format=yaml
+  # Generate CSV.
+  # Field order matters when piped to Domo, so we specify it! Yuck.
+  - ./bin/evaluate create-report $REPORT --format=csv --fields=name,title,branch,score,scored_points,total_points,downloads,security_advisory_coverage,starred,usage,recommended_version,is_stable,issues_total,issues_priority_critical,issues_priority_major,issues_priority_normal,issues_priority_minor,issues_category_bug,issues_category_feature,issues_category_support,issues_category_task,issues_category_plan,issues_status_rtbc,issues_status_fixed_last,releases_total,releases_last,releases_days_since,deprecation_errors,phpcs_drupal_errors,phpcs_drupal_warnings,phpcs_compat_errors,phpcs_compat_warnings,composer_validate,orca_integrated > report.csv
+  # Make sure we can see it in Travis output.
+  - cat report.csv
+
+# Report to domo on cron run.
+deploy:
+  provider: script
+  script: bash domo.sh
+  on:
+    branch: master
+    condition: $TRAVIS_EVENT_TYPE = cron
