@@ -6,10 +6,11 @@ branches:
     - master
     - /^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*$/
 
+php:
+ - 7.3
+
 matrix:
   fast_finish: true
-  include:
-  - php: 7.3
 
 env:
   global:
