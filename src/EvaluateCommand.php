@@ -607,7 +607,7 @@ class EvaluateCommand
             }
         } else {
             $this->io->error("  Failed to execute PHPStan against $project_name");
-            $this->io->error($phpstan_process->getErrorOutput());
+            $this->io->error($phpstan_process->getOutput());
             $output_data['deprecation_errors'] = 0;
         }
 
