@@ -300,7 +300,7 @@ class EvaluateCommand
         $this->progressBar->setMessage('Starting code analysis in background...');
         $this->progressBar->advance();
 
-        if ($major_version_int === 8) {
+        if ($major_version_int == 8) {
             $drupal_check_process = $this->startDrupalCheck($download_path);
         }
         $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
@@ -316,7 +316,7 @@ class EvaluateCommand
         $release_stats = $this->summarizeReleases($project_releases);
 
         // End code analysis processes.
-        if ($major_version_int === 8) {
+        if ($major_version_int == 8) {
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
         } else {
             $drupal_check_stats['deprecation_errors'] = 0;
@@ -607,13 +607,13 @@ class EvaluateCommand
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
             }
         }
-
         // Handle failure.
-        if (!array_key_exists('deprecation_errors', $output_data)) {
+        elseif (!array_key_exists('deprecation_errors', $output_data)) {
             // Unfortunately errors are being written to stdout and polluting
             // the output files, so I'm disabling writing errors be default.
             if ($this->output->isVerbose()) {
                 $this->io->error("  Failed to execute PHPStan against $project_name");
+                $this->io->error($phpstan_process->getErrorOutput());
             }
             $output_data['deprecation_errors'] = null;
         }
@@ -645,7 +645,7 @@ class EvaluateCommand
             // Unfortunately errors are being written to stdout and polluting
             // the output files, so I'm disabling writing errors be default.
             if ($this->output->isVerbose()) {
-                $this->io->error("  Failed to execute PHPCS against $project_name");
+                $this->io->error("  Failed to execute PHPCS for Drupal standards against $project_name");
                 $this->io->error($phpcs_process->getErrorOutput());
             }
             $output_data['phpcs_drupal_errors'] = null;
@@ -676,8 +676,12 @@ class EvaluateCommand
             $output_data['phpcs_compat_errors'] = $phpcs_output->totals->errors;
             $output_data['phpcs_compat_warnings'] = $phpcs_output->totals->warnings;
         } else {
-            $this->io->error("  Failed to execute PHPCS against $project_name");
-            $this->io->error($phpcs_process->getErrorOutput());
+            if ($this->output->isVerbose()) {
+                $this->io->error("  Failed to execute PHPCS for PHP compatibility against $project_name");
+                $this->io->error($phpcs_process->getErrorOutput());
+            }
+            $output_data['phpcs_compat_errors'] = null;
+            $output_data['phpcs_compat_warnings'] = null;
         }
 
         return $output_data;
@@ -743,7 +747,9 @@ class EvaluateCommand
      */
     protected function startPhpCsDrupal($download_path): Process
     {
-        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json -q --no-colors");
+        $command = "./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json -q --no-colors";
+
+        $process = $this->startProcess($command);
         return $process;
     }
 
@@ -757,7 +763,8 @@ class EvaluateCommand
      */
     protected function startPhpCsPhpCompat($download_path): Process
     {
-        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json -q --no-colors");
+        $command = "./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json -q --no-colors";
+        $process = $this->startProcess($command);
         return $process;
     }
 
