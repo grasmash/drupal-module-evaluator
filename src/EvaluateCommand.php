@@ -205,6 +205,7 @@ class EvaluateCommand
      *   phpcs_compat_warnings: PHPCS compat warnings
      *   composer_validate: Composer validation status
      *   orca_integrated: ORCA Integrated
+     *   report_datetime: Report Date Time
      *
      * @usage acquia_connector 8.x-1.x-dev
      *
@@ -334,6 +335,7 @@ class EvaluateCommand
         $output_data['scored_points'] = $this->score;
         $output_data['total_points'] = $this->total;
         $output_data['score'] = $this->formatPercentage($this->score, $this->total) . '%';
+        $output_data['report_datetime'] = date('c');
 
         $this->progressBar->setMessage('Done!');
         $this->progressBar->advance();
