@@ -121,7 +121,7 @@ class EvaluateCommand
      *   See ./acquia.yml for example format.
      *
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,
-     *   tsv,var_export,xml,yaml
+     * tsv,var_export,xml,yaml
      *
      * @usage acquia.yml --format=csv
      * @usage acquia.yml --fields=name,title,score,deprecation_errors
@@ -300,7 +300,7 @@ class EvaluateCommand
         $this->progressBar->setMessage('Starting code analysis in background...');
         $this->progressBar->advance();
 
-        if ($major_version_int == 8) {
+        if ($major_version_int === 8) {
             $drupal_check_process = $this->startDrupalCheck($download_path);
         }
         $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
@@ -316,7 +316,7 @@ class EvaluateCommand
         $release_stats = $this->summarizeReleases($project_releases);
 
         // End code analysis processes.
-        if ($major_version_int == 8) {
+        if ($major_version_int === 8) {
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
         } else {
             $drupal_check_stats['deprecation_errors'] = 0;
@@ -600,24 +600,20 @@ class EvaluateCommand
         $this->progressBar->advance();
         $phpstan_process->wait();
         $output_data = [];
-        if ($phpstan_process->isSuccessful() && $phpstan_process->getOutput()) {
+
+        if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
             if (property_exists($phpstan_output, 'totals')) {
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
-            } else {
-                // Unfortunately errors are being written to stdout and polluting
-                // the output files, so I'm disabling writing errors be default.
-                if ($this->output->isVerbose()) {
-                    $this->io->error("  Failed to execute PHPStan against $project_name");
-                }
-                $output_data['deprecation_errors'] = null;
             }
-        } else {
+        }
+
+        // Handle failure.
+        if (!array_key_exists('deprecation_errors', $output_data)) {
             // Unfortunately errors are being written to stdout and polluting
             // the output files, so I'm disabling writing errors be default.
             if ($this->output->isVerbose()) {
                 $this->io->error("  Failed to execute PHPStan against $project_name");
-                $this->io->error($phpstan_process->getOutput());
             }
             $output_data['deprecation_errors'] = null;
         }
@@ -641,7 +637,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $phpcs_process->wait();
         $output_data = [];
-        if ($phpcs_process->isSuccessful() && $phpcs_process->getOutput()) {
+        if ($phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
             $output_data['phpcs_drupal_errors'] = $phpcs_output->totals->errors;
             $output_data['phpcs_drupal_warnings'] = $phpcs_output->totals->warnings;
@@ -747,7 +743,7 @@ class EvaluateCommand
      */
     protected function startPhpCsDrupal($download_path): Process
     {
-        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json --config-set ignore_errors_on_exit 1 --config-set ignore_warnings_on_exit 1 -q --no-colors");
+        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json -q --no-colors");
         return $process;
     }
 
@@ -761,7 +757,7 @@ class EvaluateCommand
      */
     protected function startPhpCsPhpCompat($download_path): Process
     {
-        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json --config-set ignore_errors_on_exit 1 --config-set ignore_warnings_on_exit 1 -q --no-colors");
+        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json -q --no-colors");
         return $process;
     }
 
