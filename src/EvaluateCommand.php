@@ -554,7 +554,7 @@ class EvaluateCommand
     protected function startDrupalCheck(
         $download_path
     ): Process {
-        $command = "./vendor/bin/drupal-check --format=json --deprecations --no-interaction --no-ansi '$download_path'";
+        $command = "./vendor/bin/drupal-check --format=json --deprecations --no-interaction --no-ansi --no-progress '$download_path'";
         return $this->startProcess($command);
     }
 
@@ -641,7 +641,7 @@ class EvaluateCommand
         $this->progressBar->advance();
         $phpcs_process->wait();
         $output_data = [];
-        if ($phpcs_process->getOutput()) {
+        if ($phpcs_process->isSuccessful() && $phpcs_process->getOutput()) {
             $phpcs_output = json_decode($phpcs_process->getOutput());
             $output_data['phpcs_drupal_errors'] = $phpcs_output->totals->errors;
             $output_data['phpcs_drupal_warnings'] = $phpcs_output->totals->warnings;
@@ -747,7 +747,7 @@ class EvaluateCommand
      */
     protected function startPhpCsDrupal($download_path): Process
     {
-        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json");
+        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json --config-set ignore_errors_on_exit 1 --config-set ignore_warnings_on_exit 1 -q --no-colors");
         return $process;
     }
 
@@ -761,7 +761,7 @@ class EvaluateCommand
      */
     protected function startPhpCsPhpCompat($download_path): Process
     {
-        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json");
+        $process = $this->startProcess("./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json --config-set ignore_errors_on_exit 1 --config-set ignore_warnings_on_exit 1 -q --no-colors");
         return $process;
     }
 
