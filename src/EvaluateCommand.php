@@ -285,6 +285,9 @@ class EvaluateCommand
             $this->progressBar->advance();
             $core_download_process = $this->downloadDrupalCore($major_version_int);
             $core_download_process->wait();
+            if (!$core_download_process->isSuccessful()) {
+                throw new \Exception('Failed to download Drupal core');
+            }
         }
 
         // Download module.
@@ -602,13 +605,21 @@ class EvaluateCommand
             if (property_exists($phpstan_output, 'totals')) {
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
             } else {
-                $this->io->error("  Failed to execute PHPStan against $project_name");
-                $output_data['deprecation_errors'] = 0;
+                // Unfortunately errors are being written to stdout and polluting
+                // the output files, so I'm disabling writing errors be default.
+                if ($this->output->isVerbose()) {
+                    $this->io->error("  Failed to execute PHPStan against $project_name");
+                }
+                $output_data['deprecation_errors'] = null;
             }
         } else {
-            $this->io->error("  Failed to execute PHPStan against $project_name");
-            $this->io->error($phpstan_process->getOutput());
-            $output_data['deprecation_errors'] = 0;
+            // Unfortunately errors are being written to stdout and polluting
+            // the output files, so I'm disabling writing errors be default.
+            if ($this->output->isVerbose()) {
+                $this->io->error("  Failed to execute PHPStan against $project_name");
+                $this->io->error($phpstan_process->getOutput());
+            }
+            $output_data['deprecation_errors'] = null;
         }
 
         return $output_data;
@@ -635,8 +646,14 @@ class EvaluateCommand
             $output_data['phpcs_drupal_errors'] = $phpcs_output->totals->errors;
             $output_data['phpcs_drupal_warnings'] = $phpcs_output->totals->warnings;
         } else {
-            $this->io->error("  Failed to execute PHPCS against $project_name");
-            $this->io->error($phpcs_process->getErrorOutput());
+            // Unfortunately errors are being written to stdout and polluting
+            // the output files, so I'm disabling writing errors be default.
+            if ($this->output->isVerbose()) {
+                $this->io->error("  Failed to execute PHPCS against $project_name");
+                $this->io->error($phpcs_process->getErrorOutput());
+            }
+            $output_data['phpcs_drupal_errors'] = null;
+            $output_data['phpcs_drupal_warnings'] = null;
         }
 
         return $output_data;

@@ -46,4 +46,4 @@ deploy:
   script: bash domo.sh
   on:
     branch: master
-    condition: $TRAVIS_EVENT_TYPE = cron && $REPORT = lightning.yml
+    condition: $TRAVIS_EVENT_TYPE = cron && $REPORT = acquia.yml
