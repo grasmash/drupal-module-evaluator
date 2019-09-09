@@ -605,7 +605,7 @@ class EvaluateCommand
 
         if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
-            if (property_exists($phpstan_output, 'totals')) {
+            if (is_object($phpstan_output) && property_exists($phpstan_output, 'totals')) {
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
             }
         }
