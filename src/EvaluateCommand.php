@@ -610,7 +610,7 @@ class EvaluateCommand
             }
         }
         // Handle failure.
-        elseif (!array_key_exists('deprecation_errors', $output_data)) {
+        if (!array_key_exists('deprecation_errors', $output_data)) {
             // Unfortunately errors are being written to stdout and polluting
             // the output files, so I'm disabling writing errors be default.
             if ($this->output->isVerbose()) {
