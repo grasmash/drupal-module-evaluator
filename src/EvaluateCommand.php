@@ -188,7 +188,7 @@ class EvaluateCommand
      *   issues_priority_major: Priority Major Issues
      *   issues_priority_normal: Priority Normal Issues
      *   issues_priority_minor: Priority Minor Issues
-     *   issues_category_bug: Priority Bug Issues
+     *   issues_category_bug: Category Bug Issues
      *   issues_category_feature: Category Feature Issues
      *   issues_category_support: Category Support Issues
      *   issues_category_task: Category Task Issues
