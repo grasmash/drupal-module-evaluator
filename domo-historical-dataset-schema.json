@@ -6,7 +6,7 @@
     "columns" : [
       {
         "type": "DATETIME",
-        "name": "Report Date"
+        "name": "Report Datetime"
       },
       {
         "type": "STRING",

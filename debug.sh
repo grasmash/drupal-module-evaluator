@@ -10,9 +10,10 @@ awk 'FNR>1{print}' test.csv > test-no-headers.csv
 # @see https://developer.domo.com/docs/domo-apis/dataset
 # @see https://developer.domo.com/docs/dataset/quickstart-4
 # DOMO_CLIENT_SECRET=something. Set this in your CLI first!
+# @see https://developer.domo.com/manage-clients
 DOMO_CLIENT_ID=5cfe147e-ca58-4216-9094-96b00bffbd43
 DOMO_SCOPE=data
-DOMO_DATASET_ID=a804fe35-dbfc-4297-ac8d-1ecfe28b2fad
+DOMO_DATASET_ID=a93cb9f1-9ae3-4989-8515-0f3682f3be6a
 DOMO_ACCESS_TOKEN=$(curl -u ${DOMO_CLIENT_ID}:${DOMO_CLIENT_SECRET} "https://api.domo.com/oauth/token?grant_type=client_credentials&scope=${DOMO_SCOPE}" | jq ".access_token" -r)
 
 # Create data set. Do this only once!
