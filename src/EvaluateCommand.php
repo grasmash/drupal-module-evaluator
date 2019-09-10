@@ -134,14 +134,13 @@ class EvaluateCommand
         OutputInterface $output,
         $file,
         $options = [
-            'format' => 'table',
+            'format' => 'json',
             'fields' => '',
         ]
     ) {
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
         $default_options = [
-            'recommended-version' => null,
             'skip-core-download' => false,
         ];
         $options = array_merge($default_options, $options);
@@ -167,7 +166,6 @@ class EvaluateCommand
      *
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
      * @option major-version Either 7 or 8.
-     * @option recommended-version The stable version to evaluate. E.g., 8.x-1.0. This is used for code analysis. It will default to the latest stable version on the branch.
      * @option fields Specify which fields are output.
      * @option skip-core-download Do not re-download core. Only use this if you're repeatedly running the tool.
      * @field-labels
@@ -221,7 +219,6 @@ class EvaluateCommand
         $branch,
         $options = [
             'format' => 'table',
-            'recommended-version' => InputOption::VALUE_REQUIRED,
             'skip-core-download' => false,
             'fields' => '',
         ]
@@ -266,17 +263,10 @@ class EvaluateCommand
 
         $this->progressBar->setMessage('Querying drupal.org for project releases...');
         $this->progressBar->advance();
-        $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
-        if ($options['recommended-version']) {
-            $recommended_version = $options['recommended-version'];
-        } else {
-            $recommended_release = $this->findRecommendedRelease($project_releases, $major_version, $branch);
-            $recommended_version = $recommended_release->field_release_version;
-            if (!isset($recommended_version)) {
-                throw new \Exception("Unable to determine recommended release for $name for Drupal major version $major_version.");
-            }
-        }
+        $project_releases = $this->getProjectReleases($project, $core_compatibility);
+        $recommended_release = $this->findRecommendedRelease($project_releases, $major_version, $branch);
+        $recommended_version = $recommended_release->field_release_version;
         $metadata['recommended_version'] = $recommended_version;
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
@@ -294,7 +284,7 @@ class EvaluateCommand
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
-        $project_string = $name . "-" . $recommended_version;
+        $project_string = $name . "-" . $branch;
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
         // Start code analysis.
@@ -320,7 +310,7 @@ class EvaluateCommand
         if ($major_version_int == 8) {
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
         } else {
-            $drupal_check_stats['deprecation_errors'] = 0;
+            $drupal_check_stats['deprecation_errors'] = null;
         }
         $phpcs_drupal_stats = $this->endPhpCsDrupal($phpcs_drupal_process, $name);
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
@@ -334,7 +324,7 @@ class EvaluateCommand
         $this->calculateScore($output_data);
         $output_data['scored_points'] = $this->score;
         $output_data['total_points'] = $this->total;
-        $output_data['score'] = $this->formatPercentage($this->score, $this->total) . '%';
+        $output_data['score'] = $this->formatPercentage($this->score, $this->total);
         $output_data['report_datetime'] = date('c');
 
         $this->progressBar->setMessage('Done!');
@@ -344,24 +334,6 @@ class EvaluateCommand
         // Downloads is per module. Does not distinguish between branches.
 
         return new PropertyList($output_data);
-    }
-
-    /**
-     * Increase scored points if criteria evaluates as true.
-     *
-     * @param bool $passes
-     *   Indicates whether criteria evaluates as TRUE or FALSE.
-     * @param int $scored_points
-     *   The number of points scored.
-     * @param int $total_points
-     *   The total number of available points to score for criteria.
-     */
-    protected function scoreCriteria($passes, $scored_points, $total_points) : void
-    {
-        if ($passes) {
-            $this->score += $scored_points;
-        }
-        $this->total += $total_points;
     }
 
     /**
@@ -531,7 +503,6 @@ class EvaluateCommand
     {
         $targz_filename = "$project_string.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
-        // @todo Make major version dynamic!
         $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib/$project_string";
         file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
         $this->fs->remove($untarred_dirpath);
@@ -541,6 +512,8 @@ class EvaluateCommand
             $archive = $zippy->open($targz_filepath);
             $archive->extract($untarred_dirpath);
         }
+
+        // @todo Throw error if download fails!
 
         return $untarred_dirpath;
     }
@@ -1072,14 +1045,69 @@ class EvaluateCommand
      */
     protected function calculateScore($output_data): void
     {
-        $this->scoreCriteria($output_data['security_advisory_coverage'] === 'covered', 5, 5);
-        $this->scoreCriteria($output_data['is_stable'] === 'yes', 5, 5);
-        $this->scoreCriteria($output_data['issues_priority_critical'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['issues_status_rtbc'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['releases_days_since'] <= 90, 5, 5);
-        $this->scoreCriteria($output_data['deprecation_errors'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['phpcs_drupal_errors'] + $output_data['phpcs_drupal_warnings'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['composer_validate'] === 'passes', 5, 5);
-        $this->scoreCriteria($output_data['orca_integrated'] === 'passes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['security_advisory_coverage'] === 'covered', 5, 5);
+        $this->evaluateAndAddPoints($output_data['is_stable'] === 'yes', 5, 5);
+        $this->addScaledPoints(1.5, $output_data['issues_priority_critical'], 5);
+        $this->addScaledPoints(1, $output_data['issues_priority_major'], 5);
+        $this->addScaledPoints(1, $output_data['issues_status_rtbc'], 5);
+        $this->addScaledPoints(.1, $output_data['deprecation_errors'], 5);
+        $this->addScaledPoints(.01, $output_data['phpcs_drupal_errors'] + $output_data['phpcs_drupal_warnings'], 5);
+        $this->addScaledPoints(.75, $output_data['phpcs_compat_errors'] + $output_data['phpcs_compat_warnings'], 5);
+        $this->addScaledPoints(.01, $output_data['releases_days_since'], 5);
+        $this->evaluateAndAddPoints($output_data['composer_validate'] === 'passes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'passes', 5, 5);
+    }
+
+    /**
+     * Calculate and set the scored points based on an inverse linear function.
+     *
+     * E.g., a coeffient of .01 would produce the following scores:
+     *
+     * | variable | score |
+     * | 0        | 5     |
+     * | 90       | 4.1   |
+     * | 180      | 3.2   |
+     * | 360      | 1.4   |
+     * | 720      | 0     |
+     *
+     * @param $coefficient
+     * @param $variable
+     * @param $max_points
+     */
+    protected function addScaledPoints($coefficient, $variable, $max_points)
+    {
+        $scored_points = max($max_points - ($coefficient * $variable), 0);
+        $this->score += $scored_points;
+        $this->total += $max_points;
+    }
+
+    /**
+     * Add a fixed number of points to the score.
+     *
+     * @param $scored_points
+     * @param $total_points
+     */
+    protected function addPoints($scored_points, $total_points)
+    {
+        $this->score += $scored_points;
+        $this->total += $total_points;
+    }
+
+    /**
+     * Increase scored points if criteria evaluates as true.
+     *
+     * @param bool $passes
+     *   Indicates whether criteria evaluates as TRUE or FALSE.
+     * @param int $scored_points
+     *   The number of points scored.
+     * @param int $total_points
+     *   The total number of available points to score for criteria.
+     */
+    protected function evaluateAndAddPoints($passes, $scored_points, $total_points) : void
+    {
+        if ($passes) {
+            $this->score += $scored_points;
+        }
+        $this->total += $total_points;
     }
 }
