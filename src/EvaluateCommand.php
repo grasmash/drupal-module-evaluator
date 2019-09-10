@@ -141,7 +141,6 @@ class EvaluateCommand
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
         $default_options = [
-            'recommended-version' => null,
             'skip-core-download' => false,
         ];
         $options = array_merge($default_options, $options);
@@ -167,7 +166,6 @@ class EvaluateCommand
      *
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
      * @option major-version Either 7 or 8.
-     * @option recommended-version The stable version to evaluate. E.g., 8.x-1.0. This is used for code analysis. It will default to the latest stable version on the branch.
      * @option fields Specify which fields are output.
      * @option skip-core-download Do not re-download core. Only use this if you're repeatedly running the tool.
      * @field-labels
@@ -221,7 +219,6 @@ class EvaluateCommand
         $branch,
         $options = [
             'format' => 'table',
-            'recommended-version' => InputOption::VALUE_REQUIRED,
             'skip-core-download' => false,
             'fields' => '',
         ]
@@ -266,17 +263,10 @@ class EvaluateCommand
 
         $this->progressBar->setMessage('Querying drupal.org for project releases...');
         $this->progressBar->advance();
-        $project_releases = $this->getProjectReleases($project, $core_compatibility);
 
-        if ($options['recommended-version']) {
-            $recommended_version = $options['recommended-version'];
-        } else {
-            $recommended_release = $this->findRecommendedRelease($project_releases, $major_version, $branch);
-            $recommended_version = $recommended_release->field_release_version;
-            if (!isset($recommended_version)) {
-                throw new \Exception("Unable to determine recommended release for $name for Drupal major version $major_version.");
-            }
-        }
+        $project_releases = $this->getProjectReleases($project, $core_compatibility);
+        $recommended_release = $this->findRecommendedRelease($project_releases, $major_version, $branch);
+        $recommended_version = $recommended_release->field_release_version;
         $metadata['recommended_version'] = $recommended_version;
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
@@ -294,7 +284,7 @@ class EvaluateCommand
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
-        $project_string = $name . "-" . $recommended_version;
+        $project_string = $name . "-" . $branch;
         $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
         // Start code analysis.
@@ -334,7 +324,7 @@ class EvaluateCommand
         $this->calculateScore($output_data);
         $output_data['scored_points'] = $this->score;
         $output_data['total_points'] = $this->total;
-        $output_data['score'] = $this->formatPercentage($this->score, $this->total) . '%';
+        $output_data['score'] = $this->formatPercentage($this->score, $this->total);
         $output_data['report_datetime'] = date('c');
 
         $this->progressBar->setMessage('Done!');
@@ -513,7 +503,6 @@ class EvaluateCommand
     {
         $targz_filename = "$project_string.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
-        // @todo Make major version dynamic!
         $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib/$project_string";
         file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
         $this->fs->remove($untarred_dirpath);
@@ -523,6 +512,8 @@ class EvaluateCommand
             $archive = $zippy->open($targz_filepath);
             $archive->extract($untarred_dirpath);
         }
+
+        // @todo Throw error if download fails!
 
         return $untarred_dirpath;
     }
