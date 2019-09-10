@@ -1114,6 +1114,7 @@ class EvaluateCommand
     protected function evaluateAndAddPoints($passes, $scored_points, $total_points) : void
     {
         if ($passes) {
+            $this->score += $scored_points;
         }
         $this->total += $total_points;
     }
