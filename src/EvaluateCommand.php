@@ -134,7 +134,7 @@ class EvaluateCommand
         OutputInterface $output,
         $file,
         $options = [
-            'format' => 'table',
+            'format' => 'json',
             'fields' => '',
         ]
     ) {
@@ -320,7 +320,7 @@ class EvaluateCommand
         if ($major_version_int == 8) {
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
         } else {
-            $drupal_check_stats['deprecation_errors'] = 0;
+            $drupal_check_stats['deprecation_errors'] = null;
         }
         $phpcs_drupal_stats = $this->endPhpCsDrupal($phpcs_drupal_process, $name);
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
@@ -344,24 +344,6 @@ class EvaluateCommand
         // Downloads is per module. Does not distinguish between branches.
 
         return new PropertyList($output_data);
-    }
-
-    /**
-     * Increase scored points if criteria evaluates as true.
-     *
-     * @param bool $passes
-     *   Indicates whether criteria evaluates as TRUE or FALSE.
-     * @param int $scored_points
-     *   The number of points scored.
-     * @param int $total_points
-     *   The total number of available points to score for criteria.
-     */
-    protected function scoreCriteria($passes, $scored_points, $total_points) : void
-    {
-        if ($passes) {
-            $this->score += $scored_points;
-        }
-        $this->total += $total_points;
     }
 
     /**
@@ -1072,14 +1054,67 @@ class EvaluateCommand
      */
     protected function calculateScore($output_data): void
     {
-        $this->scoreCriteria($output_data['security_advisory_coverage'] === 'covered', 5, 5);
-        $this->scoreCriteria($output_data['is_stable'] === 'yes', 5, 5);
-        $this->scoreCriteria($output_data['issues_priority_critical'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['issues_status_rtbc'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['releases_days_since'] <= 90, 5, 5);
-        $this->scoreCriteria($output_data['deprecation_errors'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['phpcs_drupal_errors'] + $output_data['phpcs_drupal_warnings'] === 0, 5, 5);
-        $this->scoreCriteria($output_data['composer_validate'] === 'passes', 5, 5);
-        $this->scoreCriteria($output_data['orca_integrated'] === 'passes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['security_advisory_coverage'] === 'covered', 5, 5);
+        $this->evaluateAndAddPoints($output_data['is_stable'] === 'yes', 5, 5);
+        $this->addScaledPoints(1.5, $output_data['issues_priority_critical'], 5);
+        $this->addScaledPoints(1, $output_data['issues_priority_major'], 5);
+        $this->addScaledPoints(1, $output_data['issues_status_rtbc'], 5);
+        $this->addScaledPoints(.1, $output_data['deprecation_errors'], 5);
+        $this->addScaledPoints(.01, $output_data['phpcs_drupal_errors'] + $output_data['phpcs_drupal_warnings'], 5);
+        $this->addScaledPoints(.01, $output_data['releases_days_since'], 5);
+        $this->evaluateAndAddPoints($output_data['composer_validate'] === 'passes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'passes', 5, 5);
+    }
+
+    /**
+     * Calculate and set the scored points based on an inverse linear function.
+     *
+     * E.g., a coeffient of .01 would produce the following scores:
+     *
+     * | variable | score |
+     * | 0        | 5     |
+     * | 90       | 4.1   |
+     * | 180      | 3.2   |
+     * | 360      | 1.4   |
+     * | 720      | 0     |
+     *
+     * @param $coefficient
+     * @param $variable
+     * @param $max_points
+     */
+    protected function addScaledPoints($coefficient, $variable, $max_points)
+    {
+        $scored_points = max($max_points - ($coefficient * $variable), 0);
+        $this->score += $scored_points;
+        $this->total += $max_points;
+    }
+
+    /**
+     * Add a fixed number of points to the score.
+     *
+     * @param $scored_points
+     * @param $total_points
+     */
+    protected function addPoints($scored_points, $total_points)
+    {
+        $this->score += $scored_points;
+        $this->total += $total_points;
+    }
+
+    /**
+     * Increase scored points if criteria evaluates as true.
+     *
+     * @param bool $passes
+     *   Indicates whether criteria evaluates as TRUE or FALSE.
+     * @param int $scored_points
+     *   The number of points scored.
+     * @param int $total_points
+     *   The total number of available points to score for criteria.
+     */
+    protected function evaluateAndAddPoints($passes, $scored_points, $total_points) : void
+    {
+        if ($passes) {
+        }
+        $this->total += $total_points;
     }
 }
