@@ -37,7 +37,7 @@ script:
   - composer test
   # Generate CSV.
   # Field order matters when piped to Domo, so we specify it! Yuck.
-  - ./bin/evaluate create-report $REPORT --format=csv --fields=name,title,branch,score,scored_points,total_points,downloads,security_advisory_coverage,starred,usage,recommended_version,is_stable,issues_total,issues_priority_critical,issues_priority_major,issues_priority_normal,issues_priority_minor,issues_category_bug,issues_category_feature,issues_category_support,issues_category_task,issues_category_plan,issues_status_rtbc,issues_status_fixed_last,releases_total,releases_last,releases_days_since,deprecation_errors,phpcs_drupal_errors,phpcs_drupal_warnings,phpcs_compat_errors,phpcs_compat_warnings,composer_validate,orca_integrated > report.csv
+  - ./bin/evaluate create-report $REPORT --format=csv --fields=name,title,branch,score,scored_points,total_points,downloads,security_advisory_coverage,starred,usage,recommended_version,scanned_version,is_stable,issues_total,issues_priority_critical,issues_priority_major,issues_priority_normal,issues_priority_minor,issues_category_bug,issues_category_feature,issues_category_support,issues_category_task,issues_category_plan,issues_status_rtbc,issues_status_fixed_last,releases_total,releases_last,releases_days_since,deprecation_errors,deprecation_file_errors,phpcs_drupal_errors,phpcs_drupal_warnings,phpcs_compat_errors,phpcs_compat_warnings,composer_validate,orca_integrated > report.csv
   # Make sure we can see it in Travis output.
   - cat report.csv
 

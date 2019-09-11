@@ -50,6 +50,10 @@
       },
       {
         "type": "STRING",
+        "name": "Scanned version"
+      },
+      {
+        "type": "STRING",
         "name": "Is stable"
       },
       {
@@ -115,6 +119,10 @@
       {
         "type": "LONG",
         "name": "Deprecation errors"
+      },
+      {
+        "type": "LONG",
+        "name": "Deprecation file errors"
       },
       {
         "type": "LONG",

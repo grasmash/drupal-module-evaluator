@@ -141,12 +141,14 @@ class EvaluateCommand
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
         $default_options = [
+            'version' => null,
             'skip-core-download' => false,
         ];
         $options = array_merge($default_options, $options);
         $output_data = [];
         foreach ($list as $key => $args) {
-            $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $options);
+            $command_options = array_merge($options, (array) $args['options']);
+            $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $command_options);
             $output_data[] = (array) $command_output;
         }
 
@@ -165,7 +167,7 @@ class EvaluateCommand
      *   The dev version to evaluate. This is used for issue statistics.
      *
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
-     * @option major-version Either 7 or 8.
+     * @option scan-stable Scan stable release rather than dev
      * @option fields Specify which fields are output.
      * @option skip-core-download Do not re-download core. Only use this if you're repeatedly running the tool.
      * @field-labels
@@ -180,6 +182,7 @@ class EvaluateCommand
      *   starred: Starred
      *   usage: Usage
      *   recommended_version: Recommended version
+     *   scanned_version: Scanned version
      *   is_stable: Is stable
      *   issues_total: Total issues
      *   issues_priority_critical: Priority Critical Issues
@@ -197,6 +200,7 @@ class EvaluateCommand
      *   releases_last: Last release date
      *   releases_days_since: Days since last release
      *   deprecation_errors: Deprecation errors
+     *   deprecation_file_errors: Deprecation file errors
      *   phpcs_drupal_errors: PHPCS Drupal errors
      *   phpcs_drupal_warnings: PHPCS Drupal warnings
      *   phpcs_compat_errors: PHPCS compat errors
@@ -219,6 +223,7 @@ class EvaluateCommand
         $branch,
         $options = [
             'format' => 'table',
+            'scan-stable' => false,
             'skip-core-download' => false,
             'fields' => '',
         ]
@@ -284,8 +289,12 @@ class EvaluateCommand
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
-        $project_string = $name . "-" . $branch;
-        $download_path = $this->downloadProjectFromDrupalOrg($project_string);
+        if ($options['scan-stable']) {
+            $metadata['scanned_version'] = $name . "-" . $recommended_version;
+        } else {
+            $metadata['scanned_version'] = $name . "-" . $branch;
+        }
+        $download_path = $this->downloadProjectFromDrupalOrg($metadata['scanned_version']);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
@@ -579,7 +588,7 @@ class EvaluateCommand
         if ($phpstan_process->getOutput()) {
             $phpstan_output = json_decode($phpstan_process->getOutput());
             if (is_object($phpstan_output) && property_exists($phpstan_output, 'totals')) {
-                $output_data['deprecation_errors'] = $phpstan_output->totals->errors + $phpstan_output->totals->file_errors;
+                $output_data['deprecation_errors'] = $phpstan_output->totals->errors;
             }
         }
         // Handle failure.
