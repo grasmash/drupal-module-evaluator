@@ -147,7 +147,8 @@ class EvaluateCommand
         $options = array_merge($default_options, $options);
         $output_data = [];
         foreach ($list as $key => $args) {
-            $command_options = array_merge($options, (array) $args['options']);
+            $args['options'] = array_key_exists('options', $args) ? $args['options'] : [];
+            $command_options = array_merge($options, $args['options']);
             $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $command_options);
             $output_data[] = (array) $command_output;
         }
