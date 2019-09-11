@@ -1,5 +1,4 @@
 language: php
-deploy.skip_cleanup: true
 
 branches:
   # Only test the master branch and SemVer tags.
@@ -43,6 +42,7 @@ script:
 
 # Report to domo on cron run.
 deploy:
+  skip_cleanup: true
   provider: script
   script: bash domo.sh
   on:
