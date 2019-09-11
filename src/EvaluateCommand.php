@@ -93,6 +93,11 @@ class EvaluateCommand
     protected $io;
 
     /**
+     * @var string
+     */
+    protected $webroot;
+
+    /**
      * Shared setup for both commands.
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input
@@ -278,14 +283,21 @@ class EvaluateCommand
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
         // Download Drupal core.
-        if (!$this->drupalCoreDownloaded && $options['skip-core-download'] !== null) {
-            $this->progressBar->setMessage('Downloading Drupal core via Composer...');
-            $this->progressBar->advance();
-            $core_download_process = $this->downloadDrupalCore($major_version_int);
-            $core_download_process->wait();
-            if (!$core_download_process->isSuccessful()) {
-                throw new \Exception('Failed to download Drupal core');
+        if ($options['skip-core-download'] !== null) {
+            if (!$this->drupalCoreDownloaded) {
+                $this->progressBar->setMessage('Downloading Drupal core via Composer...');
+                $this->progressBar->advance();
+
+                $this->webroot = $this->tmp . '/drupal' . $major_version;
+                $core_download_process = $this->downloadDrupalCore($major_version_int);
+                $core_download_process->wait();
+                if (!$core_download_process->isSuccessful()) {
+                    throw new \Exception('Failed to download Drupal core');
+                }
             }
+        }
+        else {
+            $this->progressBar->setMessage('Skipping Drupal core download...');
         }
 
         // Download module.
@@ -293,12 +305,23 @@ class EvaluateCommand
         $this->progressBar->advance();
         if ($options['scan-stable']) {
             $metadata['scanned_version'] = $recommended_version;
-            $project_string = $name . "-" . $recommended_version;
+            $download_project_process = $this->startProjectDownloadProcess($name, $recommended_version);
         } else {
             $metadata['scanned_version'] = $branch;
-            $project_string = $name . "-" . $branch;
+            $download_project_process = $this->startProjectDownloadProcess($name, $branch);
         }
-        $download_path = $this->downloadProjectFromDrupalOrg($project_string);
+        $download_path = $this->webroot . "/modules/contrib/$name";
+
+        // Get issue statistics.
+        $this->progressBar->setMessage('Calculating issues statistics...');
+        $this->progressBar->advance();
+        $issue_stats = $this->calculateIssueStatistics($project, $branch);
+        $this->progressBar->setMessage('Calculating release statistics...');
+        $this->progressBar->advance();
+        $release_stats = $this->summarizeReleases($project_releases);
+
+        // Wait for module to finish downloading.
+        $download_project_process->wait();
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
@@ -310,14 +333,6 @@ class EvaluateCommand
         $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
         $phpcs_php_compat_process = $this->startPhpCsPhpCompat($download_path);
         $composer_validate_process = $this->startComposerValidate();
-
-        // Get issue statistics.
-        $this->progressBar->setMessage('Calculating issues statistics...');
-        $this->progressBar->advance();
-        $issue_stats = $this->calculateIssueStatistics($project, $branch);
-        $this->progressBar->setMessage('Calculating release statistics...');
-        $this->progressBar->advance();
-        $release_stats = $this->summarizeReleases($project_releases);
 
         // End code analysis processes.
         if ($major_version_int == 8) {
@@ -494,12 +509,11 @@ class EvaluateCommand
     protected function downloadDrupalCore($major_version)
     {
         $this->drupalCoreDownloaded = true;
-        $dirname = 'drupal' . $major_version;
-        $download_path = $this->tmp . '/' . $dirname;
-        $this->fs->remove($download_path);
-        $this->fs->mkdir($download_path);
+        $this->fs->remove($this->webroot);
+        $this->fs->mkdir($this->webroot);
         // @todo Cache the shit out of this!
-        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev $dirname --no-interaction --no-ansi --stability=dev --working-dir={$this->tmp}");
+        // @todo possibly git init and commit, then reset each time a project is downloaded.
+        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->webroot} --no-interaction --no-ansi --stability=dev && cd {$this->webroot} && git init && git add --all --force", $this->tmp);
 
         return $process;
     }
@@ -507,29 +521,23 @@ class EvaluateCommand
     /**
      * Downloads a project tarball from Drupal.org.
      *
-     * @param string $project_string
-     *   E.g., acquia_connector-8.x-1.0.
+     * @param string $project_name
+     *   E.g., acquia_connector.
      *
-     * @return string
-     *   The file path to the untarred archive.
+     * @param string $branch
+     *   E.g., 8.x-1.x-dev.
+     *
+     * @return Process
+     *   The Composer process.
      */
-    protected function downloadProjectFromDrupalOrg($project_string)
+    protected function startProjectDownloadProcess($project_name, $branch)
     {
-        $targz_filename = "$project_string.tar.gz";
-        $targz_filepath = "{$this->tmp}/$targz_filename";
-        $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib/$project_string";
-        file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
-        $this->fs->remove($untarred_dirpath);
-        if (!file_exists($untarred_dirpath)) {
-            $this->fs->mkdir($untarred_dirpath);
-            $zippy = Zippy::load();
-            $archive = $zippy->open($targz_filepath);
-            $archive->extract($untarred_dirpath);
-        }
+        $branch = str_replace("8.x-", "", $branch);
+        $branch = str_replace("7.x-", "", $branch);
+        $command = "git reset --hard && composer require drupal/$project_name:$branch --update-no-dev --optimize-autoloader";
+        $process = $this->startProcess($command, $this->webroot);
 
-        // @todo Throw error if download fails!
-
-        return $untarred_dirpath;
+        return $process;
     }
 
     /**
@@ -565,6 +573,7 @@ class EvaluateCommand
         $process = new Process($command, $dir, null, null, 1200);
         $process->start();
         if ($this->output->isVerbose()) {
+            $this->output->writeln("<error>Verbose flag is set. This will redirect command output to screen and prevent command output from being captured by the tool. It should be used only for debugging.</error>");
             $this->output->writeln("Executing <comment>$command</comment> in <info>$dir</info>");
             foreach ($process as $type => $data) {
                 $this->output->writeln($data);
