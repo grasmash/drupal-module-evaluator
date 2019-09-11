@@ -19,15 +19,15 @@
 - name: acsf
   branch: 8.x-2.x-dev
   options:
-  - scan-stable: true
+    scan-stable: true
 - name: acsf
   branch: 8.x-1.x-dev
   options:
-  - scan-stable: true
+    scan-stable: true
 - name: acsf
   branch: 7.x-1.x-dev
   options:
-  - scan-stable: true
+    scan-stable: true
 - name: memcache
   branch: 8.x-2.x-dev
 - name: memcache

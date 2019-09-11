@@ -142,6 +142,7 @@ class EvaluateCommand
         $list = Yaml::parseFile($file);
         $default_options = [
             'version' => null,
+            'scan-stable' => false,
             'skip-core-download' => false,
         ];
         $options = array_merge($default_options, $options);
