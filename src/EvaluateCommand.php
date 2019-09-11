@@ -292,11 +292,13 @@ class EvaluateCommand
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
         if ($options['scan-stable']) {
-            $metadata['scanned_version'] = $name . "-" . $recommended_version;
+            $metadata['scanned_version'] = $recommended_version;
+            $project_string = $name . "-" . $recommended_version;
         } else {
-            $metadata['scanned_version'] = $name . "-" . $branch;
+            $metadata['scanned_version'] = $branch;
+            $project_string = $name . "-" . $branch;
         }
-        $download_path = $this->downloadProjectFromDrupalOrg($metadata['scanned_version']);
+        $download_path = $this->downloadProjectFromDrupalOrg($project_string);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
