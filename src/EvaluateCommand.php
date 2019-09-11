@@ -320,6 +320,7 @@ class EvaluateCommand
             $drupal_check_stats = $this->endDrupalCheck($drupal_check_process, $name);
         } else {
             $drupal_check_stats['deprecation_errors'] = null;
+            $drupal_check_stats['deprecation_file_errors'] = null;
         }
         $phpcs_drupal_stats = $this->endPhpCsDrupal($phpcs_drupal_process, $name);
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
@@ -589,6 +590,7 @@ class EvaluateCommand
             $phpstan_output = json_decode($phpstan_process->getOutput());
             if (is_object($phpstan_output) && property_exists($phpstan_output, 'totals')) {
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors;
+                $output_data['deprecation_file_errors'] = $phpstan_output->totals->file_errors;
             }
         }
         // Handle failure.
@@ -600,6 +602,7 @@ class EvaluateCommand
                 $this->io->error($phpstan_process->getErrorOutput());
             }
             $output_data['deprecation_errors'] = null;
+            $output_data['deprecation_file_errors'] = null;
         }
 
         return $output_data;
