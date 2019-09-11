@@ -19,5 +19,8 @@ DOMO_ACCESS_TOKEN=$(curl -u ${DOMO_CLIENT_ID}:${DOMO_CLIENT_SECRET} "https://api
 # Create data set. Do this only once!
 # curl -v -H "Authorization:bearer ${DOMO_ACCESS_TOKEN}" -H "Content-Type: application/json" -H "Accept: application/json" -X POST "https://api.domo.com/v1/datasets" -d @domo-dataset-schema.json
 
+# Change schema.
+# curl -v -H "Authorization:bearer ${DOMO_ACCESS_TOKEN}" -H "Content-Type: application/json" -H "Accept: application/json" -X PUT "https://api.domo.com/v1/datasets/${DOMO_DATASET_ID}" -d @domo-dataset-schema.json
+
 # Update data set.
 curl -v -H "Authorization:bearer ${DOMO_ACCESS_TOKEN}" -X PUT -H "Content-Type: text/csv" -H "Accept: application/json" "https://api.domo.com/v1/datasets/${DOMO_DATASET_ID}/data" -d '@test-no-headers.csv'
