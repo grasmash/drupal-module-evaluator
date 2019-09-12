@@ -304,18 +304,21 @@ class EvaluateCommand
         else {
             $this->progressBar->setMessage('Skipping Drupal core download...');
         }
+        $download_path = $this->webroot . "/modules/contrib/$name";
+
+
+
 
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
         if ($options['scan-stable']) {
             $metadata['scanned_version'] = $recommended_version;
-            $download_project_process = $this->startProjectDownloadProcess($name, $recommended_version);
+            $download_project_process = $this->startProjectDownloadProcess($name, $recommended_version, $download_path);
         } else {
             $metadata['scanned_version'] = $branch;
-            $download_project_process = $this->startProjectDownloadProcess($name, $branch);
+            $download_project_process = $this->startProjectDownloadProcess($name, $branch, $download_path);
         }
-        $download_path = $this->webroot . "/modules/contrib/$name";
 
         // Get issue statistics.
         $this->progressBar->setMessage('Calculating issues statistics...');
@@ -327,6 +330,7 @@ class EvaluateCommand
 
         // Wait for module to finish downloading.
         $download_project_process->wait();
+        $this->downloadProjectDependencies($download_path);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
@@ -516,7 +520,16 @@ class EvaluateCommand
         $this->drupalCoreDownloaded = true;
         $this->fs->remove($this->approot);
         $this->fs->mkdir($this->approot);
-        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev && cd {$this->approot} && git init && git add --all --force && git commit -m 'Initial commit.' --quiet", $this->tmp);
+        $command[] = "composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev";
+        $command[] = "cd {$this->approot}";
+        $command[] = "composer config repositories.lightning_dev vcs https://github.com/acquia/lightning-dev";
+        // Loosen constraint to allow more variation in dev dependencies.
+        $command[] = "composer require webflo/drupal-core-require-dev:*";
+        $command[] = "git init";
+        $command[] = "git add --all --force";
+        $command[] = "git commit -m 'Initial commit.' --quiet";
+        $command = implode(" && ", $command);
+        $process = $this->startProcess($command, $this->tmp);
 
         return $process;
     }
@@ -537,10 +550,33 @@ class EvaluateCommand
     {
         $branch = str_replace("8.x-", "", $branch);
         $branch = str_replace("7.x-", "", $branch);
-        $command = "git reset --hard && composer require drupal/$project_name:$branch";
+        $command[] = "git reset --hard";
+        $command[] = "composer require drupal/$project_name:$branch";
+        $command = implode(" && ", $command);
         $process = $this->startProcess($command, $this->approot);
 
         return $process;
+    }
+
+    /**
+     * @param $download_path
+     */
+    protected function downloadProjectDependencies($download_path)
+    {
+        // Parse project composer.json.
+        $project_composer_json_filepath = $download_path . '/composer.json';
+        if (file_exists($project_composer_json_filepath)) {
+            $composer_json = json_decode(file_get_contents($project_composer_json_filepath), false);
+            if (property_exists($composer_json, 'require-dev')) {
+                $require_string = '';
+                foreach ($composer_json->{"require-dev"} as $package_name => $version_constraint) {
+                    $require_string .= "$package_name:$version_constraint ";
+                }
+                $command = "composer require $require_string --no-update && composer update";
+                $process = $this->startProcess($command, $this->approot);
+                $process->wait();
+            }
+        }
     }
 
     /**
@@ -554,14 +590,14 @@ class EvaluateCommand
     protected function startDrupalCheck(
         $download_path
     ): Process {
-        $command = "DRUPAL_ROOT={$this->approot} ./vendor/bin/drupal-check --format=json --deprecations --no-interaction --no-ansi --no-progress '$download_path'";
+        $command = "./vendor/bin/drupal-check --drupal-root={$this->approot} --format=json --deprecations --no-interaction --no-ansi --no-progress '$download_path'";
         return $this->startProcess($command);
     }
 
     /**
      * Starts a command process.
      *
-     * @param string $command
+     * @param string|array $command
      *   The command to run.
      *
      * @return \Symfony\Component\Process\Process
@@ -576,8 +612,14 @@ class EvaluateCommand
         $process = new Process($command, $dir, null, null, 1200);
         $process->start();
         if ($this->output->isVerbose()) {
+            if (is_array($command)) {
+                $command_string = implode("\n", $command);
+            }
+            else {
+                $command_string = $command;
+            }
             $this->output->writeln("<error>Verbose flag is set. This will redirect command output to screen and prevent command output from being captured by the tool. It should be used only for debugging.</error>");
-            $this->output->writeln("Executing <comment>$command</comment> in <info>$dir</info>");
+            $this->output->writeln("Executing <comment>$command_string</comment> in <info>$dir</info>");
             foreach ($process as $type => $data) {
                 $this->output->writeln($data);
             }
