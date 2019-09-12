@@ -283,12 +283,12 @@ class EvaluateCommand
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
 
         // Download Drupal core.
-        if ($options['skip-core-download'] !== null) {
+        if (!$options['skip-core-download']) {
             if (!$this->drupalCoreDownloaded) {
                 $this->progressBar->setMessage('Downloading Drupal core via Composer...');
                 $this->progressBar->advance();
 
-                $this->webroot = $this->tmp . '/drupal' . $major_version;
+                $this->webroot = $this->tmp . '/drupal' . $major_version . '/web';
                 $core_download_process = $this->downloadDrupalCore($major_version_int);
                 $core_download_process->wait();
                 if (!$core_download_process->isSuccessful()) {
@@ -513,7 +513,7 @@ class EvaluateCommand
         $this->fs->mkdir($this->webroot);
         // @todo Cache the shit out of this!
         // @todo possibly git init and commit, then reset each time a project is downloaded.
-        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->webroot} --no-interaction --no-ansi --stability=dev && cd {$this->webroot} && git init && git add --all --force", $this->tmp);
+        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->webroot} --no-interaction --no-ansi --stability=dev && cd {$this->webroot} && git init && git add --all --force && git commit -m 'Initial commit.'", $this->tmp);
 
         return $process;
     }
