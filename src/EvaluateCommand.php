@@ -554,7 +554,7 @@ class EvaluateCommand
     protected function startDrupalCheck(
         $download_path
     ): Process {
-        $command = "./vendor/bin/drupal-check --format=json --deprecations --no-interaction --no-ansi --no-progress '$download_path'";
+        $command = "DRUPAL_ROOT={$this->approot} ./vendor/bin/drupal-check --format=json --deprecations --no-interaction --no-ansi --no-progress '$download_path'";
         return $this->startProcess($command);
     }
 
