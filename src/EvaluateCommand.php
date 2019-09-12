@@ -259,6 +259,7 @@ class EvaluateCommand
             throw new \Exception('You must specify either a major version of either 7 or 8!');
         }
         $major_version = $major_version_int . '.x';
+        $this->webroot = $this->tmp . '/drupal' . $major_version . '/web';
 
         $this->progressBar->setMessage('Querying drupal.org for project metadata...');
         $this->progressBar->advance();
@@ -287,8 +288,6 @@ class EvaluateCommand
             if (!$this->drupalCoreDownloaded) {
                 $this->progressBar->setMessage('Downloading Drupal core via Composer...');
                 $this->progressBar->advance();
-
-                $this->webroot = $this->tmp . '/drupal' . $major_version . '/web';
                 $core_download_process = $this->downloadDrupalCore($major_version_int);
                 $core_download_process->wait();
                 if (!$core_download_process->isSuccessful()) {
@@ -511,8 +510,6 @@ class EvaluateCommand
         $this->drupalCoreDownloaded = true;
         $this->fs->remove($this->webroot);
         $this->fs->mkdir($this->webroot);
-        // @todo Cache the shit out of this!
-        // @todo possibly git init and commit, then reset each time a project is downloaded.
         $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->webroot} --no-interaction --no-ansi --stability=dev && cd {$this->webroot} && git init && git add --all --force && git commit -m 'Initial commit.'", $this->tmp);
 
         return $process;
