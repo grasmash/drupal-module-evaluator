@@ -5,7 +5,9 @@ namespace Grasmash\Evaluator;
 use Alchemy\Zippy\Zippy;
 use Consolidation\OutputFormatters\StructuredData\PropertyList;
 use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
+use Countable;
 use Doctrine\Common\Cache\FilesystemCache;
+use Exception;
 use Grasmash\Evaluator\DrupalOrgData\Categories;
 use Grasmash\Evaluator\DrupalOrgData\CoreCompatibilityTerms;
 use Grasmash\Evaluator\DrupalOrgData\Priorities;
@@ -161,7 +163,7 @@ class EvaluateCommand
             $args['options'] = array_key_exists('options', $args) ? $args['options'] : [];
             $command_options = array_merge($options, $args['options']);
             $command_output = $this->evaluate($input, $output, $args['name'], $args['branch'], $command_options);
-            $output_data[] = (array) $command_output;
+            $output_data[] = (array)$command_output;
         }
 
 
@@ -261,7 +263,7 @@ class EvaluateCommand
         } elseif ($major_version_int == 7) {
             $core_compatibility = CoreCompatibilityTerms::DRUPAL_7X;
         } else {
-            throw new \Exception('You must specify either a major version of either 7 or 8!');
+            throw new Exception('You must specify either a major version of either 7 or 8!');
         }
         $major_version = $major_version_int . '.x';
         $this->approot = $this->tmp . '/drupal' . $major_version;
@@ -276,7 +278,7 @@ class EvaluateCommand
             'branch' => $branch,
             'downloads' => $project->field_download_count,
             'security_advisory_coverage' => $project->field_security_advisory_coverage,
-            'starred' => (is_array($project->flag_project_star_user) || $project->flag_project_star_user instanceof \Countable) ? count($project->flag_project_star_user) : 0,
+            'starred' => (is_array($project->flag_project_star_user) || $project->flag_project_star_user instanceof Countable) ? count($project->flag_project_star_user) : 0,
             'usage' => $project->project_usage->{"$major_version"},
         ];
 
@@ -297,7 +299,7 @@ class EvaluateCommand
                 $core_download_process = $this->downloadDrupalCore($major_version_int);
                 $core_download_process->wait();
                 if (!$core_download_process->isSuccessful()) {
-                    throw new \Exception('Failed to download Drupal core');
+                    throw new Exception('Failed to download Drupal core');
                 }
             }
         } else {
@@ -305,18 +307,15 @@ class EvaluateCommand
         }
         $download_path = $this->webroot . "/modules/contrib/$name";
 
-
-
-
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
         $this->progressBar->advance();
         if ($options['scan-stable']) {
             $metadata['scanned_version'] = $recommended_version;
-            $download_project_process = $this->startProjectDownloadProcess($name, $recommended_version, $download_path);
+            $download_project_process = $this->startProjectDownloadProcess($name, $recommended_version);
         } else {
             $metadata['scanned_version'] = $branch;
-            $download_project_process = $this->startProjectDownloadProcess($name, $branch, $download_path);
+            $download_project_process = $this->startProjectDownloadProcess($name, $branch);
         }
 
         // Get issue statistics.
@@ -356,7 +355,8 @@ class EvaluateCommand
         $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
 
         // Prepare output.
-        $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
+        $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats,
+            $phpcs_php_compat_stats, $composer_stats);
 
         $this->calculateScore($output_data);
         $output_data['scored_points'] = $this->score;
@@ -410,6 +410,7 @@ class EvaluateCommand
             } else {
                 $num_issues = count($response_object->list);
             }
+
             return $num_issues;
         } else {
             return 0;
@@ -437,6 +438,7 @@ class EvaluateCommand
                 'type' => 'project_release',
                 'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
             ]);
+
             return $response_object->list;
         } else {
             return [];
@@ -452,10 +454,8 @@ class EvaluateCommand
     protected function createGuzzleClient()
     {
         $stack = HandlerStack::create();
-        $stack->push(
-            new CacheMiddleware(new PrivateCacheStrategy(new DoctrineCacheStorage(new FilesystemCache(__DIR__ . '/../cache')))),
-            'cache'
-        );
+        $stack->push(new CacheMiddleware(new PrivateCacheStrategy(new DoctrineCacheStorage(new FilesystemCache(__DIR__ . '/../cache')))),
+            'cache');
         $client = new Client(['handler' => $stack]);
 
         return $client;
@@ -477,16 +477,17 @@ class EvaluateCommand
     {
         $client = $this->createGuzzleClient();
         $response = $client->request('GET', 'https://www.drupal.org/api-d7/node.json', [
-                'query' => $query,
-                'on_stats' => function (TransferStats $stats) use (&$url) {
-                    $url = $stats->getEffectiveUri();
-                },
-            ]);
+            'query' => $query,
+            'on_stats' => function (TransferStats $stats) use (&$url) {
+                $url = $stats->getEffectiveUri();
+            },
+        ]);
         if ($response->getStatusCode() !== 200) {
-            throw new \Exception("Request to $url failed, returned {$response->getStatusCode()} with reason: {$response->getReasonPhrase()}");
+            throw new Exception("Request to $url failed, returned {$response->getStatusCode()} with reason: {$response->getReasonPhrase()}");
         }
         $body = $response->getBody()->getContents();
         $response_object = json_decode($body);
+
         return $response_object;
     }
 
@@ -534,7 +535,7 @@ class EvaluateCommand
     }
 
     /**
-     * Downloads a project tarball from Drupal.org.
+     * Downloads a project from Drupal.org via Composer.
      *
      * @param string $project_name
      *   E.g., acquia_connector.
@@ -595,6 +596,7 @@ class EvaluateCommand
         $download_path
     ): Process {
         $command = "./vendor/bin/drupal-check --drupal-root={$this->approot} --format=json --deprecations --no-interaction --no-ansi --no-progress '$download_path'";
+
         return $this->startProcess($command);
     }
 
@@ -627,6 +629,7 @@ class EvaluateCommand
                 $this->output->writeln($data);
             }
         }
+
         return $process;
     }
 
@@ -744,6 +747,7 @@ class EvaluateCommand
     protected function startComposerValidate(): Process
     {
         $process = $this->startProcess("composer validate --strict");
+
         return $process;
     }
 
@@ -798,6 +802,7 @@ class EvaluateCommand
         $command = "./vendor/bin/phpcs '$download_path' --standard=./vendor/drupal/coder/coder_sniffer/Drupal --report=json -q --no-colors";
 
         $process = $this->startProcess($command);
+
         return $process;
     }
 
@@ -813,6 +818,7 @@ class EvaluateCommand
     {
         $command = "./vendor/bin/phpcs '$download_path' --standard=./vendor/phpcompatibility/php-compatibility/PHPCompatibility --report=json -q --no-colors";
         $process = $this->startProcess($command);
+
         return $process;
     }
 
@@ -879,7 +885,7 @@ class EvaluateCommand
      * @return array
      *   Array of output data.
      */
-    protected function summarizeReleases($project_releases) : array
+    protected function summarizeReleases($project_releases): array
     {
         $num_releases = count($project_releases);
         $last_release = end($project_releases);
@@ -907,12 +913,12 @@ class EvaluateCommand
      * @throws \Exception
      *   Throws an exception if the project was not found on Drupal.org.
      */
-    protected function getProject($project_name) : object
+    protected function getProject($project_name): object
     {
         $response_object = $this->requestNode(['field_project_machine_name' => $project_name]);
         $list_count = count($response_object->list);
         if (!$list_count) {
-            throw new \Exception("No project with machine name $project_name could be found.");
+            throw new Exception("No project with machine name $project_name could be found.");
         }
 
         return $response_object->list[0];
@@ -971,17 +977,15 @@ class EvaluateCommand
     ) {
         // We're only querying dev versions. E.g., 8.x-3-x-dev.
         foreach ($project_releases as $project_release) {
-            if ($project_release->field_release_version_extra && substr(
-                $project_release->field_release_version,
-                0,
-                3
-            ) === $major_version && $project_release->field_release_version_extra === 'dev') {
+            if ($project_release->field_release_version_extra && substr($project_release->field_release_version, 0,
+                    3) === $major_version && $project_release->field_release_version_extra === 'dev') {
                 $dev_version = $project_release->field_release_version;
+
                 return $dev_version;
             }
         }
         if (!isset($dev_version)) {
-            throw new \Exception("Unable to find development release for $project_name for Drupal major version $major_version.");
+            throw new Exception("Unable to find development release for $project_name for Drupal major version $major_version.");
         }
     }
 
@@ -990,7 +994,7 @@ class EvaluateCommand
      * @param $value
      * @param $threshold
      */
-    protected function printMetric($label, $value, $threshold, $suffix = '') : void
+    protected function printMetric($label, $value, $threshold, $suffix = ''): void
     {
         $message_type = 'info';
         if ($value >= $threshold) {
@@ -1017,6 +1021,7 @@ class EvaluateCommand
             $query['field_issue_status'] = $status;
             $num_issues += $this->countProjectIssues($project, $query);
         }
+
         return $num_issues;
     }
 
@@ -1034,7 +1039,7 @@ class EvaluateCommand
     protected function getIssueStatistics(
         $project,
         $branch
-    ) : array {
+    ): array {
         $this->progressBar->setMessage('Counting open critical issues...');
         $this->progressBar->advance();
         $num_crit_issues = $this->countOpenIssues($project, [
@@ -1176,7 +1181,7 @@ class EvaluateCommand
      * @param int $total_points
      *   The total number of available points to score for criteria.
      */
-    protected function evaluateAndAddPoints($passes, $scored_points, $total_points) : void
+    protected function evaluateAndAddPoints($passes, $scored_points, $total_points): void
     {
         if ($passes) {
             $this->score += $scored_points;
