@@ -300,8 +300,7 @@ class EvaluateCommand
                     throw new \Exception('Failed to download Drupal core');
                 }
             }
-        }
-        else {
+        } else {
             $this->progressBar->setMessage('Skipping Drupal core download...');
         }
         $download_path = $this->webroot . "/modules/contrib/$name";
@@ -330,7 +329,7 @@ class EvaluateCommand
 
         // Wait for module to finish downloading.
         $download_project_process->wait();
-        $this->downloadProjectDependencies($download_path);
+        $this->downloadProjectDevDependencies($download_path);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
@@ -559,9 +558,14 @@ class EvaluateCommand
     }
 
     /**
-     * @param $download_path
+     * Download the require-dev dependencies of the project.
+     *
+     * This is necessary to scan for deprecations in a given project's tests.
+     *
+     * @param string $download_path
+     *   The file path to which the project was downloaded.
      */
-    protected function downloadProjectDependencies($download_path)
+    protected function downloadProjectDevDependencies($download_path)
     {
         // Parse project composer.json.
         $project_composer_json_filepath = $download_path . '/composer.json';
@@ -614,8 +618,7 @@ class EvaluateCommand
         if ($this->output->isVerbose()) {
             if (is_array($command)) {
                 $command_string = implode("\n", $command);
-            }
-            else {
+            } else {
                 $command_string = $command;
             }
             $this->output->writeln("<error>Verbose flag is set. This will redirect command output to screen and prevent command output from being captured by the tool. It should be used only for debugging.</error>");
