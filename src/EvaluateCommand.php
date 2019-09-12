@@ -95,6 +95,11 @@ class EvaluateCommand
     /**
      * @var string
      */
+    protected $approot;
+
+    /**
+     * @var string
+     */
     protected $webroot;
 
     /**
@@ -259,7 +264,8 @@ class EvaluateCommand
             throw new \Exception('You must specify either a major version of either 7 or 8!');
         }
         $major_version = $major_version_int . '.x';
-        $this->webroot = $this->tmp . '/drupal' . $major_version . '/web';
+        $this->approot = $this->tmp . '/drupal' . $major_version;
+        $this->webroot = $this->approot . '/web';
 
         $this->progressBar->setMessage('Querying drupal.org for project metadata...');
         $this->progressBar->advance();
@@ -508,9 +514,9 @@ class EvaluateCommand
     protected function downloadDrupalCore($major_version)
     {
         $this->drupalCoreDownloaded = true;
-        $this->fs->remove($this->webroot);
-        $this->fs->mkdir($this->webroot);
-        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->webroot} --no-interaction --no-ansi --stability=dev && cd {$this->webroot} && git init && git add --all --force && git commit -m 'Initial commit.'", $this->tmp);
+        $this->fs->remove($this->approot);
+        $this->fs->mkdir($this->approot);
+        $process = $this->startProcess("composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev && cd {$this->approot} && git init && git add --all --force && git commit -m 'Initial commit.' --quiet", $this->tmp);
 
         return $process;
     }
@@ -531,8 +537,8 @@ class EvaluateCommand
     {
         $branch = str_replace("8.x-", "", $branch);
         $branch = str_replace("7.x-", "", $branch);
-        $command = "git reset --hard && composer require drupal/$project_name:$branch --update-no-dev --optimize-autoloader";
-        $process = $this->startProcess($command, $this->webroot);
+        $command = "git reset --hard && composer require drupal/$project_name:$branch";
+        $process = $this->startProcess($command, $this->approot);
 
         return $process;
     }
