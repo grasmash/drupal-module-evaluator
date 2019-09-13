@@ -141,13 +141,14 @@ class EvaluateCommand
      *
      * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
      *   Exit code of the command.
-     * @throws \Exception
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,
      * tsv,var_export,xml,yaml
      *
      * @usage acquia.yml --format=csv
      * @usage acquia.yml --fields=name,title,score,deprecation_errors
      *
+     * @throws \Exception
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function createReport(
         InputInterface $input,
@@ -189,11 +190,8 @@ class EvaluateCommand
      *   The machine name of the project to evaluate.
      * @param string $branch
      *   The dev version to evaluate. This is used for issue statistics.
-     *
      * @param array $options
-     *
-     * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
-     *   Exit code of the command.
+     *   An array of options passed to the command.
      *
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
      * @option scan-stable Scan stable release rather than dev
@@ -239,8 +237,12 @@ class EvaluateCommand
      *   report_datetime: Report Date Time
      *
      * @usage acquia_connector 8.x-1.x-dev
-     * @throws \Exception*@throws \GuzzleHttp\Exception\GuzzleException
+     *
+     * @throws \Exception
      * @throws \GuzzleHttp\Exception\GuzzleException
+     *
+     * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
+     *   Exit code of the command.
      */
     public function evaluate(
         InputInterface $input,
@@ -311,7 +313,7 @@ class EvaluateCommand
                 $core_download_process = $this->downloadDrupalCore($major_version_int);
                 $core_download_process->wait();
                 if (!$core_download_process->isSuccessful()) {
-                    throw new Exception('Failed to download Drupal core');
+                    throw new Exception("Failed to download Drupal $major_version_int core");
                 }
             }
         } else {
@@ -343,15 +345,15 @@ class EvaluateCommand
         if (!$download_project_process->isSuccessful()) {
             throw new Exception("Failed to download project $name:" . $metadata['scanned_version']);
         }
-        $this->downloadProjectDevDependencies($download_path);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
         $this->progressBar->advance();
-
         if ($major_version_int == 8) {
+            $this->downloadProjectDevDependencies($download_path);
             $drupal_check_process = $this->startDrupalCheck($download_path);
         }
+
         $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
         $phpcs_php_compat_process = $this->startPhpCsPhpCompat($download_path);
         $composer_validate_process = $this->startComposerValidate();
@@ -538,21 +540,23 @@ class EvaluateCommand
     /**
      * Downloads Drupal core using drupal-composer/drupal-project via Composer.
      *
-     * @param int $major_version
+     * @param int $major_version_int
      *   The major version of Drupal core. E.g., 8.
      *
      * @return \Symfony\Component\Process\Process
      */
-    protected function downloadDrupalCore($major_version)
+    protected function downloadDrupalCore($major_version_int)
     {
-        $this->setIsDrupalCoreDownloaded($major_version, true);
+        $this->setIsDrupalCoreDownloaded($major_version_int, true);
         $this->fs->remove($this->approot);
         $this->fs->mkdir($this->approot);
-        $command[] = "composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev";
+        $command[] = "composer create-project drupal-composer/drupal-project:{$major_version_int}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev";
         $command[] = "cd {$this->approot}";
-        $command[] = 'composer config repositories.lightning_dev vcs https://github.com/acquia/lightning-dev';
-        // Loosen constraint to allow more variation in dev dependencies.
-        $command[] = 'composer require webflo/drupal-core-require-dev:*';
+        if ($major_version_int == 8) {
+            $command[] = 'composer config repositories.lightning_dev vcs https://github.com/acquia/lightning-dev';
+            // Loosen constraint to allow more variation in dev dependencies.
+            $command[] = 'composer require webflo/drupal-core-require-dev:*';
+        }
         $command[] = 'git init';
         $command[] = 'git add --all --force';
         $command[] = "git commit -m 'Initial commit.' --quiet";
@@ -605,6 +609,9 @@ class EvaluateCommand
                 $command = "composer require $require_string --no-update && composer update";
                 $process = $this->startProcess($command, $this->approot);
                 $process->wait();
+                if (!$process->isSuccessful()) {
+                    throw new Exception("Failed dev dependencies in $download_path");
+                }
             }
         }
     }
