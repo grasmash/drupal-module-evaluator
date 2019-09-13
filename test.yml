@@ -1,4 +1,8 @@
-- name: acquia_purge
+- name: acsf
   branch: 8.x-1.x-dev
-- name: acquia_purge
+  options:
+    scan-stable: true
+- name: acsf
   branch: 7.x-1.x-dev
+  options:
+    scan-stable: true

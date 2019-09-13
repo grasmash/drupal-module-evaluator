@@ -470,6 +470,8 @@ class EvaluateCommand
                 'field_release_project' => $project->nid,
                 'type' => 'project_release',
                 'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
+                'sort' => 'created',
+                'direction' => 'DESC',
             ]);
 
             return $response_object->list;
@@ -599,6 +601,8 @@ class EvaluateCommand
      *
      * @param string $download_path
      *   The file path to which the project was downloaded.
+     *
+     * @throws \Exception
      */
     protected function downloadProjectDevDependencies($download_path)
     {
@@ -611,11 +615,11 @@ class EvaluateCommand
                 foreach ($composer_json->{'require-dev'} as $package_name => $version_constraint) {
                     $require_string .= "$package_name:$version_constraint ";
                 }
-                $command = "composer require $require_string --no-update && composer update";
+                $command = "composer require $require_string --no-update --dev && composer update";
                 $process = $this->startProcess($command, $this->approot);
                 $process->wait();
                 if (!$process->isSuccessful()) {
-                    throw new Exception("Failed dev dependencies in $download_path");
+                    throw new Exception("Failed dev to download dependencies in $download_path");
                 }
             }
         }
