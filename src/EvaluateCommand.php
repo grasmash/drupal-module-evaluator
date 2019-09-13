@@ -319,7 +319,6 @@ class EvaluateCommand
         } else {
             $this->progressBar->setMessage('Skipping Drupal core download...');
         }
-        $download_path = $this->webroot . "/modules/contrib/$name";
 
         // Download module.
         $this->progressBar->setMessage('Downloading project from Drupal.org...');
@@ -350,8 +349,14 @@ class EvaluateCommand
         $this->progressBar->setMessage('Starting code analysis in background...');
         $this->progressBar->advance();
         if ($major_version_int == 8) {
+            $download_path = $this->webroot . "/modules/contrib/$name";
             $this->downloadProjectDevDependencies($download_path);
             $drupal_check_process = $this->startDrupalCheck($download_path);
+        }
+        else {
+            // @todo Dynamically determine this from composer.json value extra.installer-paths where value
+            // is ["type:drupal-module"].
+            $download_path = $this->webroot . "/sites/all/modules/contrib/$name";
         }
 
         $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
