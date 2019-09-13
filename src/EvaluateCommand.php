@@ -85,7 +85,12 @@ class EvaluateCommand
     /**
      * @var bool
      */
-    protected $drupalCoreDownloaded = false;
+    protected $drupalCore8Downloaded = false;
+
+    /**
+     * @var bool
+     */
+    protected $drupalCore7Downloaded = false;
 
     /**
      * @var SymfonyStyle
@@ -186,10 +191,10 @@ class EvaluateCommand
      *   The dev version to evaluate. This is used for issue statistics.
      *
      * @param array $options
+     *
      * @return \Consolidation\OutputFormatters\StructuredData\PropertyList
      *   Exit code of the command.
      *
-     * @throws \Exception
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,tsv,var_export,xml,yaml
      * @option scan-stable Scan stable release rather than dev
      * @option fields Specify which fields are output.
@@ -234,7 +239,8 @@ class EvaluateCommand
      *   report_datetime: Report Date Time
      *
      * @usage acquia_connector 8.x-1.x-dev
-     *
+     * @throws \Exception*@throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function evaluate(
         InputInterface $input,
@@ -299,8 +305,8 @@ class EvaluateCommand
 
         // Download Drupal core.
         if (!$options['skip-core-download']) {
-            if (!$this->drupalCoreDownloaded) {
-                $this->progressBar->setMessage('Downloading Drupal core via Composer...');
+            if (!$this->getIsDrupalCoreDownloaded($major_version_int)) {
+                $this->progressBar->setMessage("Downloading Drupal $major_version_int core via Composer...");
                 $this->progressBar->advance();
                 $core_download_process = $this->downloadDrupalCore($major_version_int);
                 $core_download_process->wait();
@@ -334,6 +340,9 @@ class EvaluateCommand
 
         // Wait for module to finish downloading.
         $download_project_process->wait();
+        if (!$download_project_process->isSuccessful()) {
+            throw new Exception("Failed to download project $name:" . $metadata['scanned_version']);
+        }
         $this->downloadProjectDevDependencies($download_path);
 
         // Start code analysis.
@@ -536,7 +545,7 @@ class EvaluateCommand
      */
     protected function downloadDrupalCore($major_version)
     {
-        $this->drupalCoreDownloaded = true;
+        $this->setIsDrupalCoreDownloaded($major_version, true);
         $this->fs->remove($this->approot);
         $this->fs->mkdir($this->approot);
         $command[] = "composer create-project drupal-composer/drupal-project:{$major_version}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev";
@@ -1209,5 +1218,26 @@ class EvaluateCommand
             $this->score += $scored_points;
         }
         $this->total += $total_points;
+    }
+
+    /**
+     * @param $major_version
+     *
+     * @return string
+     */
+    protected function getIsDrupalCoreDownloaded($major_version)
+    {
+        $varname = "drupalCore{$major_version}Downloaded";
+        return $this->$varname;
+    }
+    /**
+     * @param $major_version
+     *
+     * @return void
+     */
+    protected function setIsDrupalCoreDownloaded($major_version, $is_downloaded): void
+    {
+        $varname = "drupalCore{$major_version}Downloaded";
+        $this->$varname = $is_downloaded;
     }
 }

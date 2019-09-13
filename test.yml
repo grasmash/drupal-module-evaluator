@@ -1,2 +1,4 @@
-- name: acquia_connector
+- name: acquia_purge
   branch: 8.x-1.x-dev
+- name: acquia_purge
+  branch: 7.x-1.x-dev
