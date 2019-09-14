@@ -313,7 +313,7 @@ class EvaluateCommand
                 $core_download_process = $this->downloadDrupalCore($major_version_int);
                 $core_download_process->wait();
                 if (!$core_download_process->isSuccessful()) {
-                    throw new Exception("Failed to download Drupal $major_version_int core");
+                    throw new Exception("Failed to download Drupal $major_version_int core.");
                 }
             }
         } else {
@@ -342,7 +342,7 @@ class EvaluateCommand
         // Wait for module to finish downloading.
         $download_project_process->wait();
         if (!$download_project_process->isSuccessful()) {
-            throw new Exception("Failed to download project $name:" . $metadata['scanned_version']);
+            throw new Exception("Failed to download project $name:" . $metadata['scanned_version'] . "Executed command was " . $download_project_process->getCommandLine());
         }
 
         // Start code analysis.
@@ -557,12 +557,12 @@ class EvaluateCommand
         $this->setIsDrupalCoreDownloaded($major_version_int, true);
         $this->fs->remove($this->approot);
         $this->fs->mkdir($this->approot);
-        $command[] = "composer create-project drupal-composer/drupal-project:{$major_version_int}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev";
+        $command[] = "composer create-project drupal-composer/drupal-project:{$major_version_int}.x-dev {$this->approot} --no-interaction --no-ansi --stability=dev --remove-vcs --no-install";
         $command[] = "cd {$this->approot}";
         if ($major_version_int == 8) {
             $command[] = 'composer config repositories.lightning_dev vcs https://github.com/acquia/lightning-dev';
             // Loosen constraint to allow more variation in dev dependencies.
-            $command[] = 'composer require webflo/drupal-core-require-dev:*';
+            $command[] = 'composer require webflo/drupal-core-require-dev:* --dev';
         }
         $command[] = 'git init';
         $command[] = 'git add --all --force';
@@ -586,6 +586,7 @@ class EvaluateCommand
      */
     protected function startProjectDownloadProcess($project_name, $branch)
     {
+
         $branch = str_replace(array('8.x-', '7.x-'), '', $branch);
         $command[] = 'git reset --hard';
         $command[] = "composer require drupal/$project_name:$branch";
@@ -619,7 +620,14 @@ class EvaluateCommand
                 $process = $this->startProcess($command, $this->approot);
                 $process->wait();
                 if (!$process->isSuccessful()) {
-                    throw new Exception("Failed dev to download dependencies in $download_path");
+                    // If that failed, try removing webflo/drupal-core-require-dev and re-running.
+                    // This is required for acsf 8.x-2.x.
+                    $this->progressBar->setMessage('Downloading dev dependencies failed, removing webflo/drupal-core-require-dev and trying again.');
+                    $process = $this->startProcess("composer remove webflo/drupal-core-require-dev --no-update && $command", $this->approot);
+                    $process->wait();
+                    if (!$process->isSuccessful()) {
+                        throw new Exception("Failed dev to download dependencies in $download_path");
+                    }
                 }
             }
         }
@@ -1060,6 +1068,7 @@ class EvaluateCommand
      * @return int
      *   The number of issues.
      * @throws \Exception
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function countOpenIssues($project, array $query = []): int
     {
@@ -1082,6 +1091,7 @@ class EvaluateCommand
      *
      * @return array
      *   An array of issues statistics.
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function getIssueStatistics(
         $project,
