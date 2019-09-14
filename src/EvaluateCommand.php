@@ -165,6 +165,7 @@ class EvaluateCommand
             'version' => null,
             'scan-stable' => false,
             'skip-core-download' => false,
+            'download-dev-dependencies' => false,
         ];
         $options = array_merge($default_options, $options);
         $output_data = [];
@@ -197,6 +198,7 @@ class EvaluateCommand
      * @option scan-stable Scan stable release rather than dev
      * @option fields Specify which fields are output.
      * @option skip-core-download Do not re-download core. Only use this if you're repeatedly running the tool.
+     * @option download-dev-dependencies Download the dev dependencies of the module. False by default.
      * @field-labels
      *   name: Name
      *   title: Title
@@ -254,6 +256,7 @@ class EvaluateCommand
             'scan-stable' => false,
             'skip-core-download' => false,
             'fields' => '',
+            'download-dev-dependencies' => false,
         ]
     ): PropertyList {
         $this->setup($input, $output);
@@ -350,7 +353,9 @@ class EvaluateCommand
         $this->progressBar->advance();
         if ($major_version_int === '8') {
             $download_path = $this->webroot . "/modules/contrib/$name";
-            $this->downloadProjectDevDependencies($download_path);
+            if ($options['download-dev-dependencies']) {
+                $this->downloadProjectDevDependencies($download_path);
+            }
             $drupal_check_process = $this->startDrupalCheck($download_path);
         }
         else {
@@ -619,14 +624,7 @@ class EvaluateCommand
                 $process = $this->startProcess($command, $this->approot);
                 $process->wait();
                 if (!$process->isSuccessful()) {
-                    // If that failed, try removing webflo/drupal-core-require-dev and re-running.
-                    // This is required for acsf 8.x-2.x.
-                    $this->progressBar->setMessage('Downloading dev dependencies failed, removing webflo/drupal-core-require-dev and trying again.');
-                    $process = $this->startProcess("composer remove webflo/drupal-core-require-dev --no-update --dev && $command", $this->approot);
-                    $process->wait();
-                    if (!$process->isSuccessful()) {
-                        throw new Exception("Failed dev to download dependencies in $download_path");
-                    }
+                    throw new Exception("Failed dev to download dependencies in $download_path");
                 }
             }
         }
@@ -705,6 +703,7 @@ class EvaluateCommand
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors;
                 $output_data['deprecation_file_errors'] = $phpstan_output->totals->file_errors;
             }
+            $output_data['deprecation_output'] = (string) $phpstan_output;
         }
         // Handle failure.
         if (!array_key_exists('deprecation_errors', $output_data)) {
@@ -716,6 +715,7 @@ class EvaluateCommand
             }
             $output_data['deprecation_errors'] = null;
             $output_data['deprecation_file_errors'] = null;
+            $output_data['deprecation_output'] = null;
         }
 
         return $output_data;

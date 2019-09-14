@@ -1,8 +1,3 @@
-- name: acsf
-  branch: 8.x-1.x-dev
+- name: lightning_api
   options:
-    scan-stable: true
-- name: acsf
-  branch: 7.x-1.x-dev
-  options:
-    scan-stable: true
+    download-dev-dependencies: true
