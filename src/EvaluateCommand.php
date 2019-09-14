@@ -611,6 +611,7 @@ class EvaluateCommand
      */
     protected function downloadProjectDevDependencies($download_path): void
     {
+        $this->progressBar->setMessage("Downloading dev dependencies from $download_path...");
         // Parse project composer.json.
         $project_composer_json_filepath = $download_path . '/composer.json';
         if (file_exists($project_composer_json_filepath)) {
@@ -703,7 +704,6 @@ class EvaluateCommand
                 $output_data['deprecation_errors'] = $phpstan_output->totals->errors;
                 $output_data['deprecation_file_errors'] = $phpstan_output->totals->file_errors;
             }
-            $output_data['deprecation_output'] = (string) $phpstan_output;
         }
         // Handle failure.
         if (!array_key_exists('deprecation_errors', $output_data)) {
@@ -715,7 +715,6 @@ class EvaluateCommand
             }
             $output_data['deprecation_errors'] = null;
             $output_data['deprecation_file_errors'] = null;
-            $output_data['deprecation_output'] = null;
         }
 
         return $output_data;
