@@ -4,10 +4,10 @@
   branch: 7.x-3.x-dev
 - name: acquia_purge
   branch: 8.x-1.x-dev
-- name: purge
-  branch: 8.x-3.x-dev
 - name: acquia_purge
   branch: 7.x-1.x-dev
+- name: purge
+  branch: 8.x-3.x-dev
 - name: media_acquiadam
   branch: 8.x-1.x-dev
 - name: acquia_lift
@@ -42,14 +42,24 @@
   branch: 8.x-1.x-dev
 - name: lightning_api
   branch: 8.x-4.x-dev
+  options:
+    download-dev-dependencies: true
 - name: lightning_core
   branch: 8.x-4.x-dev
+  options:
+    download-dev-dependencies: true
 - name: lightning_layout
   branch: 8.x-1.x-dev
+  options:
+    download-dev-dependencies: true
 - name: lightning_media
   branch: 8.x-3.x-dev
+  options:
+    download-dev-dependencies: true
 - name: lightning_workflow
   branch: 8.x-3.x-dev
+  options:
+    download-dev-dependencies: true
 # Apache Solr Integration
 # Apache Solr Multisite Search
 # Acquia Lightning

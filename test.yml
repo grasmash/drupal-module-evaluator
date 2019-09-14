@@ -1,2 +1,3 @@
-- name: acquia_connector
-  branch: 8.x-1.x-dev
+- name: lightning_api
+  options:
+    download-dev-dependencies: true
