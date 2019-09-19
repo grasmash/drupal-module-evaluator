@@ -330,7 +330,7 @@ class EvaluateCommand
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        $metadata['orca_integrated'] = $this->isOrcaIntegrated($download_path);
+        $metadata['orca_integrated'] = $this->isOrcaIntegrated($download_path) ? 'yes' : 'no';
 
         // Prepare output.
         $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
