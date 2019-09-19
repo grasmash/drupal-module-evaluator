@@ -330,7 +330,7 @@ class EvaluateCommand
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
+        $metadata['orca_integrated'] = $this->isOrcaIntegrated($download_path);
 
         // Prepare output.
         $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
@@ -1125,5 +1125,22 @@ class EvaluateCommand
             $this->score += $scored_points;
         }
         $this->total += $total_points;
+    }
+
+    /**
+     * @param string $download_path
+     *
+     * @return bool
+     */
+    protected function isOrcaIntegrated(string $download_path): bool
+    {
+        if (file_exists($download_path . '/travis.yml')) {
+            $travis_yml_contents = file_get_contents($download_path . '/travis.yml');
+            if (strpos($travis_yml_contents, 'orca') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
