@@ -1071,7 +1071,7 @@ class EvaluateCommand
         $this->addScaledPoints(.75, $output_data['phpcs_compat_errors'] + $output_data['phpcs_compat_warnings'], 5);
         $this->addScaledPoints(.01, $output_data['releases_days_since'], 5);
         $this->evaluateAndAddPoints($output_data['composer_validate'] === 'passes', 5, 5);
-        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'passes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'yes', 5, 5);
     }
 
     /**
