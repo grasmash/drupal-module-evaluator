@@ -293,12 +293,10 @@ class EvaluateCommand
         $this->progressBar->advance();
         if ($options['scan-stable']) {
             $metadata['scanned_version'] = $recommended_version;
-            $project_string = $name . "-" . $recommended_version;
         } else {
             $metadata['scanned_version'] = $branch;
-            $project_string = $name . "-" . $branch;
         }
-        $download_path = $this->downloadProjectFromDrupalOrg($project_string);
+        $download_path = $this->downloadProjectFromDrupalOrg($name, $metadata['scanned_version']);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
@@ -330,7 +328,7 @@ class EvaluateCommand
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        $metadata['orca_integrated'] = $this->isOrcaIntegrated($download_path) ? 'yes' : 'no';
+        $metadata['orca_integrated'] = $this->isOrcaIntegrated($metadata['scanned_version']) ? 'yes' : 'no';
 
         // Prepare output.
         $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
@@ -513,11 +511,11 @@ class EvaluateCommand
      * @return string
      *   The file path to the untarred archive.
      */
-    protected function downloadProjectFromDrupalOrg($project_string)
+    protected function downloadProjectFromDrupalOrg($name, $version)
     {
-        $targz_filename = "$project_string.tar.gz";
+        $targz_filename = "{$name}-{$version}.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
-        $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib/$project_string";
+        $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib";
         file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
         $this->fs->remove($untarred_dirpath);
         if (!file_exists($untarred_dirpath)) {
@@ -529,7 +527,7 @@ class EvaluateCommand
 
         // @todo Throw error if download fails!
 
-        return $untarred_dirpath;
+        return $untarred_dirpath . "/$name";
     }
 
     /**
@@ -1132,10 +1130,9 @@ class EvaluateCommand
      *
      * @return bool
      */
-    protected function isOrcaIntegrated(string $download_path): bool
+    protected function isOrcaIntegrated(string $scanned_version): bool
     {
-        if (file_exists($download_path . '/travis.yml')) {
-            $travis_yml_contents = file_get_contents($download_path . '/travis.yml');
+        if ($travis_yml_contents = file_get_contents("https://git.drupalcode.org/project/lightning_layout/blob/$scanned_version/.travis.yml" . '/travis.yml')) {
             if (strpos($travis_yml_contents, 'ORCA_SUT_NAME') !== false) {
                 return true;
             }
