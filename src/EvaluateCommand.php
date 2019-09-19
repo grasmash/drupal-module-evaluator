@@ -1136,7 +1136,7 @@ class EvaluateCommand
     {
         if (file_exists($download_path . '/travis.yml')) {
             $travis_yml_contents = file_get_contents($download_path . '/travis.yml');
-            if (strpos($travis_yml_contents, 'orca') !== false) {
+            if (strpos($travis_yml_contents, 'ORCA_SUT_NAME') !== false) {
                 return true;
             }
         }
