@@ -19,7 +19,6 @@ use Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage;
 use Kevinrob\GuzzleCache\Strategy\PrivateCacheStrategy;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
@@ -293,12 +292,10 @@ class EvaluateCommand
         $this->progressBar->advance();
         if ($options['scan-stable']) {
             $metadata['scanned_version'] = $recommended_version;
-            $project_string = $name . "-" . $recommended_version;
         } else {
             $metadata['scanned_version'] = $branch;
-            $project_string = $name . "-" . $branch;
         }
-        $download_path = $this->downloadProjectFromDrupalOrg($project_string);
+        $download_path = $this->downloadProjectFromDrupalOrg($name, $metadata['scanned_version']);
 
         // Start code analysis.
         $this->progressBar->setMessage('Starting code analysis in background...');
@@ -330,7 +327,7 @@ class EvaluateCommand
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        $metadata['orca_integrated'] = file_exists($download_path . '/tests/packages.yml') ? 'yes' : 'no';
+        $metadata['orca_integrated'] = $this->isOrcaIntegrated($name, $metadata['scanned_version']) ? 'yes' : 'no';
 
         // Prepare output.
         $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
@@ -513,11 +510,11 @@ class EvaluateCommand
      * @return string
      *   The file path to the untarred archive.
      */
-    protected function downloadProjectFromDrupalOrg($project_string)
+    protected function downloadProjectFromDrupalOrg($name, $version)
     {
-        $targz_filename = "$project_string.tar.gz";
+        $targz_filename = "{$name}-{$version}.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
-        $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib/$project_string";
+        $untarred_dirpath = "{$this->tmp}/drupal8/web/modules/contrib";
         file_put_contents($targz_filepath, fopen("https://ftp.drupal.org/files/projects/$targz_filename", 'r'));
         $this->fs->remove($untarred_dirpath);
         if (!file_exists($untarred_dirpath)) {
@@ -526,10 +523,12 @@ class EvaluateCommand
             $archive = $zippy->open($targz_filepath);
             $archive->extract($untarred_dirpath);
         }
-
         // @todo Throw error if download fails!
 
-        return $untarred_dirpath;
+        $project_path = $untarred_dirpath . "/$name";
+        $this->fs->remove($project_path . '/composer.json');
+
+        return $project_path;
     }
 
     /**
@@ -1071,7 +1070,7 @@ class EvaluateCommand
         $this->addScaledPoints(.75, $output_data['phpcs_compat_errors'] + $output_data['phpcs_compat_warnings'], 5);
         $this->addScaledPoints(.01, $output_data['releases_days_since'], 5);
         $this->evaluateAndAddPoints($output_data['composer_validate'] === 'passes', 5, 5);
-        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'passes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'yes', 5, 5);
     }
 
     /**
@@ -1125,5 +1124,49 @@ class EvaluateCommand
             $this->score += $scored_points;
         }
         $this->total += $total_points;
+    }
+
+    /**
+     * @param string $project
+     * @param string $scanned_version
+     *
+     * @return bool
+     */
+    protected function isOrcaIntegrated(string $project, string $scanned_version): bool
+    {
+        // Weirdly, dev tarballs don't include .travis.yml, even though stable tarballs do.
+        $scanned_version = str_replace('-dev', '', $scanned_version);
+        $url = "https://git.drupalcode.org/project/$project/raw/$scanned_version/.travis.yml";
+        $travis_yml_contents = $this->downloadFile($url);
+        if (strpos($travis_yml_contents, 'ORCA_SUT_NAME') !== false) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Download a file from a url.
+     * @param $url
+     *
+     * @return bool|string
+     */
+    protected function downloadFile($url)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        // We spoof the user agent because GitLab will deny access otherwise.
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13');
+
+        if (curl_exec($ch) === false) {
+            curl_close($ch);
+            return false;
+        } else {
+            $output = curl_exec($ch);
+            curl_close($ch);
+            return $output;
+        }
     }
 }

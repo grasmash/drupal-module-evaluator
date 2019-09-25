@@ -45,7 +45,7 @@
 - name: lightning_core
   branch: 8.x-4.x-dev
 - name: lightning_layout
-  branch: 8.x-1.x-dev
+  branch: 8.x-2.x-dev
 - name: lightning_media
   branch: 8.x-3.x-dev
 - name: lightning_workflow

@@ -17,7 +17,8 @@
         "symfony/console": "^3.4",
         "symfony/filesystem": "^4.2",
         "symfony/finder": "^3.4",
-        "symfony/process": "^3.4"
+        "symfony/process": "^3.4",
+        "ext-curl": "*"
     },
     "autoload": {
         "psr-4": {
