@@ -328,7 +328,7 @@ class EvaluateCommand
         $phpcs_php_compat_stats = $this->endPhpCsPhpCompat($phpcs_php_compat_process, $name);
         $composer_stats = $this->endComposerValidate($composer_validate_process);
 
-        $metadata['orca_integrated'] = $this->isOrcaIntegrated($metadata['scanned_version']) ? 'yes' : 'no';
+        $metadata['orca_integrated'] = $this->isOrcaIntegrated($name, $metadata['scanned_version']) ? 'yes' : 'no';
 
         // Prepare output.
         $output_data = array_merge($metadata, $issue_stats, $release_stats, $drupal_check_stats, $phpcs_drupal_stats, $phpcs_php_compat_stats, $composer_stats);
@@ -524,10 +524,12 @@ class EvaluateCommand
             $archive = $zippy->open($targz_filepath);
             $archive->extract($untarred_dirpath);
         }
-
         // @todo Throw error if download fails!
 
-        return $untarred_dirpath . "/$name";
+        $project_path = $untarred_dirpath . "/$name";
+        $this->fs->remove($project_path . '/composer.json');
+
+        return $project_path;
     }
 
     /**
@@ -1126,13 +1128,17 @@ class EvaluateCommand
     }
 
     /**
-     * @param string $download_path
+     * @param string $project
+     * @param string $scanned_version
      *
      * @return bool
      */
-    protected function isOrcaIntegrated(string $scanned_version): bool
+    protected function isOrcaIntegrated(string $project, string $scanned_version): bool
     {
-        if ($travis_yml_contents = file_get_contents("https://git.drupalcode.org/project/lightning_layout/blob/$scanned_version/.travis.yml" . '/travis.yml')) {
+        // Weirdly, dev tarballs don't include .travis.yml, even though stable tarballs do.
+        $scanned_version = str_replace('-dev', '', $scanned_version);
+        $url = "https://git.drupalcode.org/project/$project/blob/$scanned_version/.travis.yml";
+        if ($travis_yml_contents = file_get_contents($url)) {
             if (strpos($travis_yml_contents, 'ORCA_SUT_NAME') !== false) {
                 return true;
             }
