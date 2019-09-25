@@ -17,6 +17,7 @@ use GuzzleHttp\TransferStats;
 use Kevinrob\GuzzleCache\CacheMiddleware;
 use Kevinrob\GuzzleCache\Storage\DoctrineCacheStorage;
 use Kevinrob\GuzzleCache\Strategy\PrivateCacheStrategy;
+use mysql_xdevapi\Exception;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -1137,13 +1138,38 @@ class EvaluateCommand
     {
         // Weirdly, dev tarballs don't include .travis.yml, even though stable tarballs do.
         $scanned_version = str_replace('-dev', '', $scanned_version);
-        $url = "https://git.drupalcode.org/project/$project/blob/$scanned_version/.travis.yml";
-        if ($travis_yml_contents = file_get_contents($url)) {
-            if (strpos($travis_yml_contents, 'ORCA_SUT_NAME') !== false) {
-                return true;
-            }
+        $url = "https://git.drupalcode.org/project/$project/raw/$scanned_version/.travis.yml";
+        $travis_yml_contents = $this->downloadFile($url);
+        if (strpos($travis_yml_contents, 'ORCA_SUT_NAME') !== false) {
+            return true;
         }
 
         return false;
+    }
+
+    /**
+     * Download a file from a url.
+     * @param $url
+     *
+     * @return bool|string
+     */
+    protected function downloadFile($url) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        // We spoof the user agent because GitLab will deny access otherwise.
+        curl_setopt($ch,CURLOPT_USERAGENT,'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13');
+
+        if (curl_exec($ch) === FALSE) {
+            curl_close($ch);
+            return false;
+        }
+        else {
+            $output = curl_exec($ch);
+            curl_close($ch);
+            return $output;
+        }
+
     }
 }
