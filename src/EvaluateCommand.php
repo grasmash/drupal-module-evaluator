@@ -128,6 +128,7 @@ class EvaluateCommand
      * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
      *   Exit code of the command.
      * @throws \Exception
+     * @throws \GuzzleHttp\Exception\GuzzleException
      * @option string $format Valid formats are: csv,json,list,null,php,print-r,
      * tsv,var_export,xml,yaml
      *
@@ -143,7 +144,7 @@ class EvaluateCommand
             'format' => 'json',
             'fields' => '',
         ]
-    ) {
+    ): RowsOfFields {
         $this->setup($input, $output);
         $list = Yaml::parseFile($file);
         $default_options = [
@@ -239,7 +240,7 @@ class EvaluateCommand
             'skip-core-download' => false,
             'fields' => '',
         ]
-    ) {
+    ): PropertyList {
         $this->setup($input, $output);
         ProgressBar::setFormatDefinition('custom', 'Evaluating <comment>%module%</comment>
  %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%
@@ -371,7 +372,7 @@ class EvaluateCommand
      * @throws \Exception
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    protected function countProjectIssues($project, $query = [])
+    protected function countProjectIssues($project, $query = []): int
     {
         if ($project->field_project_has_issue_queue) {
             $default_query = [
@@ -416,7 +417,7 @@ class EvaluateCommand
      * @throws \Exception
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    protected function getProjectReleases($project, $core_compatibility)
+    protected function getProjectReleases($project, $core_compatibility): array
     {
         // Maybe use a different endpoint?
         // @see https://updates.drupal.org/release-history/ctools/8.x
@@ -490,7 +491,7 @@ class EvaluateCommand
      * @return string
      *   The formatted percentage.
      */
-    protected function formatPercentage($numerator, $denominator)
+    protected function formatPercentage($numerator, $denominator): string
     {
         return number_format($numerator / $denominator * 100, 2);
     }
@@ -503,7 +504,7 @@ class EvaluateCommand
      *
      * @return \Symfony\Component\Process\Process
      */
-    protected function downloadDrupalCore($major_version)
+    protected function downloadDrupalCore($major_version): Process
     {
         $this->drupalCoreDownloaded = true;
         $dirname = 'drupal' . $major_version;
@@ -525,7 +526,7 @@ class EvaluateCommand
      * @return string
      *   The file path to the untarred archive.
      */
-    protected function downloadProjectFromDrupalOrg($name, $version)
+    protected function downloadProjectFromDrupalOrg($name, $version): string
     {
         $targz_filename = "{$name}-{$version}.tar.gz";
         $targz_filepath = "{$this->tmp}/$targz_filename";
@@ -599,7 +600,7 @@ class EvaluateCommand
     protected function endDrupalCheck(
         Process $phpstan_process,
         $project_name
-    ) {
+    ): array {
         $this->progressBar->setMessage('Waiting for phpstan to finish...');
         $this->progressBar->advance();
         $phpstan_process->wait();
@@ -638,7 +639,7 @@ class EvaluateCommand
     protected function endPhpCsDrupal(
         $phpcs_process,
         $project_name
-    ) {
+    ): array {
         $this->progressBar->setMessage('Waiting for phpcs to finish...');
         $this->progressBar->advance();
         $phpcs_process->wait();
@@ -672,7 +673,7 @@ class EvaluateCommand
     protected function endPhpCsPhpCompat(
         $phpcs_process,
         $project_name
-    ) {
+    ): array {
         $this->progressBar->setMessage('Waiting for phpcs to finish...');
         $this->progressBar->advance();
         $phpcs_process->wait();
@@ -712,7 +713,7 @@ class EvaluateCommand
      *
      * @return array
      */
-    protected function endComposerValidate($process)
+    protected function endComposerValidate($process): array
     {
         $this->progressBar->setMessage('Waiting for composer to finish...');
         $this->progressBar->advance();
@@ -785,7 +786,7 @@ class EvaluateCommand
      * @throws \Exception
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    protected function calculateIssueStatistics($project, $branch)
+    protected function calculateIssueStatistics($project, $branch): array
     {
         // Determine version to filter on.
         $this->progressBar->setMessage('Counting total open issues...');
@@ -871,7 +872,7 @@ class EvaluateCommand
         $response_object = $this->requestNode(['field_project_machine_name' => $project_name]);
         $list_count = count($response_object->list);
         if (!$list_count) {
-            throw new Exception("No project with machine name $project_name could be found.");
+            throw new \Exception("No project with machine name $project_name could be found.");
         }
 
         return $response_object->list[0];
@@ -1047,7 +1048,7 @@ class EvaluateCommand
         $this->addScaledPoints(.75, $output_data['phpcs_compat_errors'] + $output_data['phpcs_compat_warnings'], 5);
         $this->addScaledPoints(.01, $output_data['releases_days_since'], 5);
         $this->evaluateAndAddPoints($output_data['composer_validate'] === 'passes', 5, 5);
-        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'yes', 5, 5);
+        $this->evaluateAndAddPoints($output_data['orca_integrated'] === 'yes', 10, 10);
     }
 
     /**
@@ -1066,7 +1067,7 @@ class EvaluateCommand
      * @param $variable
      * @param $max_points
      */
-    protected function addScaledPoints($coefficient, $variable, $max_points)
+    protected function addScaledPoints($coefficient, $variable, $max_points): void
     {
         $scored_points = max($max_points - ($coefficient * $variable), 0);
         $this->score += $scored_points;
