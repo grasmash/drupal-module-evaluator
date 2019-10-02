@@ -4,6 +4,8 @@
   branch: 7.x-3.x-dev
 - name: acquia_purge
   branch: 8.x-1.x-dev
+- name: acquia_search_solr
+  branch: 8.x-1.x-dev
 - name: purge
   branch: 8.x-3.x-dev
 - name: acquia_purge
@@ -36,6 +38,8 @@
   branch: 8.x-1.x-dev
 - name: search_api_solr
   branch: 8.x-1.x-dev
+- name: search_api_solr
+  branch: 8.x-3.x-dev
 - name: facets
   branch: 8.x-1.x-dev
 - name: acquia_commercemanager
