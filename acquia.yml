@@ -54,6 +54,9 @@
   branch: 8.x-3.x-dev
 - name: lightning_workflow
   branch: 8.x-3.x-dev
-# Apache Solr Integration
+- name: apachesolr
+  branch: 7.x-1.x-dev
+- name: search_api_acquia
+  branch: 7.x-2.x-dev
 # Apache Solr Multisite Search
 # Acquia Lightning
