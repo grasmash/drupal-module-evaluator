@@ -1,5 +1,11 @@
 - name: acquia_connector
   branch: 8.x-1.x-dev
+  owners:
+    eng: someone
+    prod: someone
+  documentation:
+    confluence: true
+    drupal.org: true
 - name: acquia_connector
   branch: 7.x-3.x-dev
 - name: acquia_purge
