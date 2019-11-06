@@ -44,6 +44,12 @@
   branch: 8.x-1.x-dev
 - name: acquia_commercemanager
   branch: 8.x-1.x-dev
+- name: layout_builder_st
+  branch: 8.x-1.x-dev
+- name: lb_everywhere
+  branch: 8.x-1.x-dev
+- name: lb_ux
+  branch: 8.x-1.x-dev
 - name: lightning_api
   branch: 8.x-4.x-dev
 - name: lightning_core
