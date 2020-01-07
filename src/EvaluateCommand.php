@@ -318,7 +318,7 @@ class EvaluateCommand
         }
         $phpcs_drupal_process = $this->startPhpCsDrupal($download_path);
         $phpcs_php_compat_process = $this->startPhpCsPhpCompat($download_path);
-        $composer_validate_process = $this->startComposerValidate();
+        $composer_validate_process = $this->startComposerValidate($download_path);
 
         // Get issue statistics.
         $this->progressBar->setMessage('Calculating issues statistics...');
@@ -542,7 +542,6 @@ class EvaluateCommand
         // @todo Throw error if download fails!
 
         $project_path = $untarred_dirpath . "/$name";
-        $this->fs->remove($project_path . '/composer.json');
 
         return $project_path;
     }
@@ -697,12 +696,15 @@ class EvaluateCommand
     /**
      * Starts the `composer validate` process.
      *
+     * @param string $download_path
+     *  The path of the directory to scan.
+     *
      * @return \Symfony\Component\Process\Process
      *   The started PHP process.
      */
-    protected function startComposerValidate(): Process
+    protected function startComposerValidate($download_path): Process
     {
-        return $this->startProcess('composer validate --strict');
+        return $this->startProcess('composer validate --strict', $download_path);
     }
 
     /**
