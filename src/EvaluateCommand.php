@@ -805,6 +805,7 @@ class EvaluateCommand
             'field_issue_status' => Statuses::RTBC,
             'sort' => 'changed',
             'direction' => 'DESC',
+            'field_issue_version' => $branch,
         ];
         $response_object = $this->requestNode($query);
         $num_rtbc = count($response_object->list);
