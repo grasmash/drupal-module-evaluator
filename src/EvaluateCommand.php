@@ -426,6 +426,8 @@ class EvaluateCommand
                 'field_release_project' => $project->nid,
                 'type' => 'project_release',
                 'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
+                'sort' => 'created',
+                'direction' => 'DESC',
             ]);
             return $response_object->list;
         }
