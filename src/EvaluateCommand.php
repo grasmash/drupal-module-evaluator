@@ -426,6 +426,8 @@ class EvaluateCommand
                 'field_release_project' => $project->nid,
                 'type' => 'project_release',
                 'taxonomy_vocabulary_' . Vocabularies::CORE_COMPATIBILITY => $core_compatibility,
+                'sort' => 'created',
+                'direction' => 'DESC',
             ]);
             return $response_object->list;
         }
@@ -899,10 +901,8 @@ class EvaluateCommand
         $major_version,
         $branch
     ) {
-        // Stable releases are typically at the end of the array.
-        $releases = array_reverse($project_releases);
         $branch_minor_version = $branch[4];
-        foreach ($releases as $project_release) {
+        foreach ($project_releases as $project_release) {
             // If field_release_version_extra is null, then it is not a dev
             // alpha, beta, or rc release.
             $release_major_version = substr($project_release->field_release_version, 0, 3);
@@ -911,7 +911,7 @@ class EvaluateCommand
             }
         }
         // Otherwise, return a non-stable release.
-        foreach ($releases as $project_release) {
+        foreach ($project_releases as $project_release) {
             $release_major_version = substr($project_release->field_release_version, 0, 3);
             if ($release_major_version === $major_version && $project_release->field_release_version_major === $branch_minor_version) {
                 return $project_release;
