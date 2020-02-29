@@ -845,8 +845,9 @@ class EvaluateCommand
      */
     protected function summarizeReleases($project_releases) : array
     {
+        // This maxes out at the items per page limit, 50.
         $num_releases = count($project_releases);
-        $last_release = end($project_releases);
+        $last_release = reset($project_releases);
         $last_release_date = date('r', $last_release->created);
         $now = time();
         $datediff = $now - $last_release->created;
