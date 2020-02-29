@@ -901,9 +901,7 @@ class EvaluateCommand
         $major_version,
         $branch
     ) {
-        // Stable releases are typically at the end of the array.
-        $releases = array_reverse($project_releases);
-        $branch_minor_version = $branch[4];
+        $project_releases = $branch[4];
         foreach ($releases as $project_release) {
             // If field_release_version_extra is null, then it is not a dev
             // alpha, beta, or rc release.
