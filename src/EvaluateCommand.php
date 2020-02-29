@@ -901,8 +901,8 @@ class EvaluateCommand
         $major_version,
         $branch
     ) {
-        $releases = $branch[4];
-        foreach ($releases as $project_release) {
+        $branch_minor_version = $branch[4];
+        foreach ($project_releases as $project_release) {
             // If field_release_version_extra is null, then it is not a dev
             // alpha, beta, or rc release.
             $release_major_version = substr($project_release->field_release_version, 0, 3);
@@ -911,7 +911,7 @@ class EvaluateCommand
             }
         }
         // Otherwise, return a non-stable release.
-        foreach ($releases as $project_release) {
+        foreach ($project_releases as $project_release) {
             $release_major_version = substr($project_release->field_release_version, 0, 3);
             if ($release_major_version === $major_version && $project_release->field_release_version_major === $branch_minor_version) {
                 return $project_release;
