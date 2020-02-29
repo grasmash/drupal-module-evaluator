@@ -901,7 +901,7 @@ class EvaluateCommand
         $major_version,
         $branch
     ) {
-        $project_releases = $branch[4];
+        $releases = $branch[4];
         foreach ($releases as $project_release) {
             // If field_release_version_extra is null, then it is not a dev
             // alpha, beta, or rc release.
