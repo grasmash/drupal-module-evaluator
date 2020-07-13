@@ -264,7 +264,7 @@ class EvaluateCommand
         } else {
             throw new Exception('You must specify either a major version of either 7 or 8!');
         }
-        $major_version = $major_version_int . '.x';
+        $major_version = str_replace('-dev', '', $branch);
 
         $this->progressBar->setMessage('Querying drupal.org for project metadata...');
         $this->progressBar->advance();
@@ -273,7 +273,9 @@ class EvaluateCommand
             'name' => $name,
             'title' => $project->title,
             'branch' => $branch,
-            'downloads' => $project->field_download_count,
+            'downloads' => NULL,
+            // @todo Remove this from the schema. Drupal.org no longer returns this information.
+            // 'downloads' => $project->field_download_count,
             'security_advisory_coverage' => $project->field_security_advisory_coverage,
             'starred' => (is_array($project->flag_project_star_user) || $project->flag_project_star_user instanceof Countable) ? count($project->flag_project_star_user) : 0,
             'usage' => $project->project_usage->{"$major_version"},
@@ -283,7 +285,7 @@ class EvaluateCommand
         $this->progressBar->advance();
 
         $project_releases = $this->getProjectReleases($project, $core_compatibility);
-        $recommended_release = $this->findRecommendedRelease($project_releases, $major_version, $branch);
+        $recommended_release = $this->findRecommendedRelease($project_releases, $major_version_int, $branch);
         $recommended_version = $recommended_release->field_release_version;
         $metadata['recommended_version'] = $recommended_version;
         $metadata['is_stable'] = is_null($recommended_release->field_release_version_extra) ? 'yes' : 'no';
@@ -890,7 +892,7 @@ class EvaluateCommand
      * Matches a given major version and branch.
      *
      * @param $project_releases
-     * @param $major_version
+     * @param int $major_version_int
      * @param string $branch
      *   The module branch. E.g., 8.x-2.x-dev.
      *
@@ -899,9 +901,10 @@ class EvaluateCommand
      */
     protected function findRecommendedRelease(
         $project_releases,
-        $major_version,
+        $major_version_int,
         $branch
     ) {
+        $major_version = $major_version_int . '.x';
         $branch_minor_version = $branch[4];
         foreach ($project_releases as $project_release) {
             // If field_release_version_extra is null, then it is not a dev

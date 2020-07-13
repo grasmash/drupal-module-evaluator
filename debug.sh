@@ -9,8 +9,15 @@
 # Domo interactions.
 # @see https://developer.domo.com/docs/domo-apis/dataset
 # @see https://developer.domo.com/docs/dataset/quickstart-4
-# DOMO_CLIENT_SECRET=something. Set this in your CLI first!
+
+# Set the secret in your CLI first:
+# export DOMO_CLIENT_SECRET=[whatever]
 # @see https://developer.domo.com/manage-clients
+if [[ -z "$DOMO_CLIENT_SECRET" ]]; then
+    echo "Must provide DOMO_CLIENT_SECRET in environment" 1>&2
+    exit 1
+fi
+
 DOMO_CLIENT_ID=5cfe147e-ca58-4216-9094-96b00bffbd43
 DOMO_SCOPE=data
 DOMO_DATASET_ID=a93cb9f1-9ae3-4989-8515-0f3682f3be6a
