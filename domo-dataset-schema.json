@@ -147,6 +147,10 @@
       {
         "type": "STRING",
         "name": "ORCA Integrated"
+      },
+      {
+        "type": "DATETIME",
+        "name": "Report Datetime"
       }
     ]
   }

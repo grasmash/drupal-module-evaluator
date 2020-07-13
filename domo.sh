@@ -12,7 +12,7 @@ fi
 DOMO_CLIENT_ID=5cfe147e-ca58-4216-9094-96b00bffbd43
 DOMO_SCOPE=data
 DOMO_DATASET_ID=a93cb9f1-9ae3-4989-8515-0f3682f3be6a
-DOMO_UPDATE_METHOD=REPLACE
+DOMO_UPDATE_METHOD=APPEND
 
 # Strip header cells from CSV for Domo.
 rm report-no-headers.csv
